@@ -20,26 +20,41 @@ async function getQuestions(): Promise<QuestionDocument[]> {
     const q = query(questionsCollection, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
     
+    const parseTimestampToDate = (timestampField: any): Date => {
+      if (timestampField instanceof Timestamp) {
+        return timestampField.toDate();
+      }
+      if (timestampField instanceof Date) {
+        return timestampField;
+      }
+      if (typeof timestampField === 'string' || typeof timestampField === 'number') {
+        const parsedDate = new Date(timestampField);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+      return new Date(); 
+    };
+
     const questions = querySnapshot.docs.map(doc => {
       const data = doc.data();
-      // Ensure all fields are present and correctly typed
       return {
         id: doc.id,
         title: data.title || '',
         link: data.link || '',
         description: data.description || '',
-        difficulty: data.difficulty || 'Easy', // Provide a default or handle missing
-        platform: data.platform || 'Other', // Provide a default or handle missing
+        difficulty: data.difficulty || 'Easy', 
+        platform: data.platform || 'Other', 
         topicName: data.topicName || '',
         comments: data.comments || '',
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(), // Convert Timestamp to Date
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(), // Convert Timestamp to Date
+        createdAt: parseTimestampToDate(data.createdAt),
+        updatedAt: parseTimestampToDate(data.updatedAt),
       } as QuestionDocument;
     });
     return questions;
   } catch (error) {
     console.error("Error fetching questions: ", error);
-    return []; // Return empty array on error
+    return []; 
   }
 }
 
@@ -78,7 +93,7 @@ export default async function QuestionsPage() {
                       <Badge 
                         variant={
                           question.difficulty === "Easy" ? "secondary" : 
-                          question.difficulty === "Medium" ? "default" : // using primary color for medium
+                          question.difficulty === "Medium" ? "default" : 
                           question.difficulty === "Hard" ? "destructive" : "outline"
                         }
                         className={

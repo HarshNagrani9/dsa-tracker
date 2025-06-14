@@ -27,13 +27,13 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
   try {
     const contestData = {
       ...validationResult.data,
-      date: Timestamp.fromDate(validationResult.data.date), // Convert JS Date to Firestore Timestamp
+      date: Timestamp.fromDate(validationResult.data.date), 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
     await addDoc(collection(db, 'contests'), contestData);
     revalidatePath('/contests');
-    revalidatePath('/'); // For upcoming contests count on dashboard
+    revalidatePath('/'); 
     return {
       success: true,
       message: 'Contest added successfully!',
@@ -55,10 +55,24 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
 export async function getContestsAction(): Promise<ContestDocumentClient[]> {
   try {
     const contestsCollection = collection(db, 'contests');
-    // Simplified query to order only by date.
-    // For sorting by date then startTime, a composite index (date DESC, startTime ASC) is needed in Firestore.
     const q = query(contestsCollection, orderBy('date', 'desc'));
     const querySnapshot = await getDocs(q);
+
+    const parseTimestampToDate = (timestampField: any): Date => {
+      if (timestampField instanceof Timestamp) {
+        return timestampField.toDate();
+      }
+      if (timestampField instanceof Date) {
+        return timestampField;
+      }
+      if (typeof timestampField === 'string' || typeof timestampField === 'number') {
+        const parsedDate = new Date(timestampField);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+      return new Date(); 
+    };
 
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
@@ -66,12 +80,12 @@ export async function getContestsAction(): Promise<ContestDocumentClient[]> {
         id: doc.id,
         title: data.title,
         platform: data.platform,
-        date: (data.date as Timestamp).toDate(), // Convert Firestore Timestamp to JS Date
+        date: parseTimestampToDate(data.date), 
         startTime: data.startTime,
         endTime: data.endTime,
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
-      } as ContestDocumentClient;
+        createdAt: parseTimestampToDate(data.createdAt),
+        updatedAt: parseTimestampToDate(data.updatedAt),
+      } as ContestDocumentClient; 
     });
   } catch (error) {
     console.error('Error fetching contests:', error);
@@ -83,7 +97,7 @@ export async function getUpcomingContestsCountAction(): Promise<number> {
   try {
     const contestsCollection = collection(db, "contests");
     const today = new Date();
-    today.setHours(0,0,0,0); // Start of today for comparison
+    today.setHours(0,0,0,0); 
     const todayTimestamp = Timestamp.fromDate(today);
 
     const q = query(contestsCollection, where("date", ">=", todayTimestamp));
@@ -94,4 +108,3 @@ export async function getUpcomingContestsCountAction(): Promise<number> {
     return 0;
   }
 }
-

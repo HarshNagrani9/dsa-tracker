@@ -54,17 +54,34 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
 export async function getTopicsAction(): Promise<TopicDocument[]> {
   try {
     const topicsCollection = collection(db, 'topics');
-    const q = query(topicsCollection, orderBy('name', 'asc')); // Order by name
+    const q = query(topicsCollection, orderBy('name', 'asc'));
     const querySnapshot = await getDocs(q);
+
+    const parseTimestampToDate = (timestampField: any): Date => {
+      if (timestampField instanceof Timestamp) {
+        return timestampField.toDate();
+      }
+      if (timestampField instanceof Date) {
+        return timestampField;
+      }
+      if (typeof timestampField === 'string' || typeof timestampField === 'number') {
+        const parsedDate = new Date(timestampField);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+      // Fallback for unhandled or invalid types
+      return new Date(); 
+    };
 
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
       return {
         id: doc.id,
         name: data.name,
-        createdAt: (data.createdAt as Timestamp)?.toDate() || new Date(),
-        updatedAt: (data.updatedAt as Timestamp)?.toDate() || new Date(),
-      } as TopicDocument;
+        createdAt: parseTimestampToDate(data.createdAt),
+        updatedAt: parseTimestampToDate(data.updatedAt),
+      };
     });
   } catch (error) {
     console.error('Error fetching topics:', error);
