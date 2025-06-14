@@ -1,4 +1,6 @@
 import type { LucideIcon } from "lucide-react";
+import { z } from "zod";
+import { DIFFICULTIES, PLATFORMS } from "./constants";
 
 export interface NavItem {
   title: string;
@@ -21,7 +23,7 @@ export type Platform = "LeetCode" | "CSES" | "CodeChef" | "Codeforces" | "Other"
 export type Question = {
   id: string;
   topicId: string;
-  title: string; // Added title for better display
+  title: string;
   link: string;
   description: string;
   comments: string;
@@ -48,3 +50,16 @@ export type ActivityLog = {
   date: string; // YYYY-MM-DD
   count: number;
 };
+
+// Schema for adding a new question
+export const AddQuestionSchema = z.object({
+  title: z.string().min(3, { message: "Title must be at least 3 characters long." }),
+  link: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  description: z.string().optional(),
+  difficulty: z.enum(DIFFICULTIES, { required_error: "Difficulty is required." }),
+  platform: z.enum(PLATFORMS, { required_error: "Platform is required." }),
+  topicName: z.string().min(1, { message: "Topic name is required." }),
+  comments: z.string().optional(),
+});
+
+export type AddQuestionFormInput = z.infer<typeof AddQuestionSchema>;
