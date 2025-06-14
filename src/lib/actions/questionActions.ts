@@ -1,12 +1,15 @@
+
 'use server';
 
 import type { AddQuestionFormInput } from '@/lib/types';
 import { AddQuestionSchema } from '@/lib/types';
+import { db } from '@/lib/firebase/config';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 interface ActionResult {
   success: boolean;
   message: string;
-  error?: string | null;
+  error?: string | string[] | null; 
 }
 
 export async function addQuestionAction(data: AddQuestionFormInput): Promise<ActionResult> {
@@ -20,15 +23,30 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     };
   }
 
-  // Simulate saving the data
-  console.log("New Question Data:", validationResult.data);
+  try {
+    const questionData = {
+      ...validationResult.data,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    
+    const docRef = await addDoc(collection(db, "questions"), questionData);
+    console.log("Document written with ID: ", docRef.id);
 
-  // In a real application, you would save to a database here.
-  // For now, we'll just simulate success.
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
-
-  return {
-    success: true,
-    message: "Question added successfully!",
-  };
+    return {
+      success: true,
+      message: "Question added successfully to Firestore!",
+    };
+  } catch (e) {
+    console.error("Error adding document: ", e);
+    let errorMessage = "Failed to add question to Firestore.";
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    }
+    return {
+      success: false,
+      message: errorMessage,
+      error: String(e),
+    };
+  }
 }
