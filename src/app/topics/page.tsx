@@ -31,19 +31,20 @@ export default async function TopicsPage() {
               <ul className="space-y-3">
                 {topics.map((topic) => (
                   <li key={topic.id}>
-                    <Link href={`/topics/${topic.id}`} legacyBehavior={false} passHref={false}>
-                      <a className="flex items-center justify-between p-4 bg-muted/50 rounded-md hover:bg-muted transition-colors group">
-                        <div className="flex items-center gap-3">
-                          <ListChecks className="h-5 w-5 text-primary group-hover:text-accent" />
-                          <span className="font-medium group-hover:text-accent">{topic.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                           <Badge variant="secondary" className="font-normal">
-                            {topic.questionCount || 0} Question{topic.questionCount === 1 ? '' : 's'}
-                           </Badge>
-                          <FileQuestion className="h-4 w-4 text-muted-foreground group-hover:text-accent" />
-                        </div>
-                      </a>
+                    <Link 
+                      href={`/topics/${topic.id}`}
+                      className="flex items-center justify-between p-4 bg-muted/50 rounded-md hover:bg-muted transition-colors group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ListChecks className="h-5 w-5 text-primary group-hover:text-accent" />
+                        <span className="font-medium group-hover:text-accent">{topic.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                         <Badge variant="secondary" className="font-normal">
+                          {topic.questionCount || 0} Question{topic.questionCount === 1 ? '' : 's'}
+                         </Badge>
+                        <FileQuestion className="h-4 w-4 text-muted-foreground group-hover:text-accent" />
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -61,3 +62,4 @@ export default async function TopicsPage() {
     </div>
   );
 }
+
