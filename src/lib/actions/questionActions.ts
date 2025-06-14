@@ -4,7 +4,7 @@
 import type { AddQuestionFormInput, QuestionDocument } from '@/lib/types';
 import { AddQuestionSchema } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore'; // orderBy import removed if not used
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -26,7 +26,7 @@ const parseTimestampToDate = (timestampField: any): Date => {
       return parsedDate;
     }
   }
-  console.warn('Unparseable date encountered, returning current date as fallback:', timestampField);
+  // console.warn('Unparseable date encountered in parseTimestampToDate, returning current date as fallback:', timestampField);
   return new Date();
 };
 
@@ -51,17 +51,12 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     };
 
     const docRef = await addDoc(collection(db, "questions"), questionData);
-    console.log("Document written with ID: ", docRef.id);
+    // console.log("Document written with ID: ", docRef.id);
 
     revalidatePath('/questions');
     revalidatePath('/');
     revalidatePath('/topics');
-    if (validationResult.data.topicName) {
-        // No specific topic ID to revalidate here, /topics covers list counts.
-        // Revalidate the specific topic page if its path can be constructed.
-        // For now, revalidating the general /topics path for list updates is sufficient.
-    }
-
+    // No need to revalidate specific topicId page here, /topics covers list counts.
 
     return {
       success: true,
@@ -84,14 +79,13 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 export async function getQuestionsByTopicNameAction(topicName: string): Promise<QuestionDocument[]> {
   try {
     const questionsCollection = collection(db, "questions");
-    // For sorting by createdAt, a composite index on topicName (asc) and createdAt (desc) is required in Firestore.
-    // The Firebase console usually provides a link to create this index if such an error occurs.
-    // The orderBy clause has been temporarily removed to allow fetching questions without this specific index.
-    // Questions will appear, but may not be sorted chronologically.
+    // The query is simplified to only filter by topicName.
+    // Sorting by createdAt (desc) was removed to avoid the "index required" error.
+    // For sorted results, the composite index (topicName ASC, createdAt DESC) must be created in Firestore.
     const q = query(
       questionsCollection,
       where("topicName", "==", topicName)
-      // orderBy("createdAt", "desc") // Temporarily removed
+      // orderBy("createdAt", "desc") // THIS LINE IS INTENTIONALLY REMOVED
     );
     const querySnapshot = await getDocs(q);
 
@@ -113,11 +107,10 @@ export async function getQuestionsByTopicNameAction(topicName: string): Promise<
     return questions;
   } catch (error) {
     console.error(`Error fetching questions for topic "${topicName}": `, error);
-    // If the error is specifically about a missing index, Firebase usually provides a link to create it in the console.
-    // Re-throw the error or handle it as appropriate for your application
     if (error instanceof Error && error.message.includes("query requires an index")) {
-      console.error("Firestore query requires an index. Please create it in the Firebase console using the link provided in the original error message or logs.");
+      console.error(`Firestore query for topic "${topicName}" requires an index. Please create it in the Firebase console using the link provided in the original error message or logs.`);
     }
-    return []; // Return empty array or re-throw error based on desired behavior
+    return [];
   }
 }
+
