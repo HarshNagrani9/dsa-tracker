@@ -25,7 +25,6 @@ const parseTimestampToDate = (timestampField: any): Date => {
       return parsedDate;
     }
   }
-  // Fallback to current date if parsing fails, though ideally, this shouldn't be hit with valid Firestore data
   console.warn(`[parseTimestampToDate] Failed to parse timestamp:`, timestampField, `Returning current date.`);
   return new Date(); 
 };
@@ -57,8 +56,9 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
       updatedAt: serverTimestamp() as Timestamp,
     };
     await addDoc(collection(db, 'contests'), contestData);
-    revalidatePath('/contests'); // For the contests list page
-    revalidatePath('/'); // For dashboard upcoming contests count
+    console.log(`[addContestAction] Contest "${validationResult.data.title}" added successfully for user ${validationResult.data.userId}.`);
+    revalidatePath('/contests'); 
+    revalidatePath('/'); 
     return {
       success: true,
       message: 'Contest added successfully!',
@@ -85,15 +85,19 @@ export async function getContestsAction(userId: string | null | undefined): Prom
   console.log(`[getContestsAction] Fetching contests for userId: ${userId}`);
   try {
     const contestsCollection = collection(db, 'contests');
+    // TEMPORARILY REMOVED orderBy('date', 'desc') for diagnostics
     const q = query(
       contestsCollection, 
-      where('userId', '==', userId),
-      orderBy('date', 'desc') // This ordering requires a composite index
+      where('userId', '==', userId)
+      // orderBy('date', 'desc') // This ordering requires a composite index
     );
+    console.log(`[getContestsAction] TEMPORARILY SIMPLIFIED QUERY. Original would be: query(contestsCollection, where('userId', '==', userId), orderBy('date', 'desc'))`);
+    console.log(`[getContestsAction] If data loads now but is unsorted, you NEED an INDEX on 'contests': userId (Ascending), date (Descending)`);
+
     console.log(`[getContestsAction] Constructed Firestore query for contests (user "${userId}"):`, JSON.stringify({
       collection: 'contests',
       filters: [{ field: 'userId', op: '==', value: userId }],
-      orderBy: [{ field: 'date', direction: 'desc' }]
+      // orderBy: [{ field: 'date', direction: 'desc' }] // Temporarily removed
     }, null, 2));
 
     const querySnapshot = await getDocs(q);
@@ -114,6 +118,8 @@ export async function getContestsAction(userId: string | null | undefined): Prom
       } as ContestDocumentClient; 
     });
     console.log(`[getContestsAction] Successfully mapped ${contests.length} contests.`);
+    // If contests were not sorted by query, sort them here if needed for UI consistency (though this is less efficient)
+    // contests.sort((a, b) => b.date.getTime() - a.date.getTime()); 
     return contests;
 
   } catch (error) {
@@ -121,7 +127,7 @@ export async function getContestsAction(userId: string | null | undefined): Prom
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`!!! FIRESTORE INDEX REQUIRED for 'contests' collection for Contest Page !!!`);
-      console.error(`Query involved: where('userId', '==', '${userId}'), orderBy('date', 'desc')`);
+      console.error(`Original query involved: where('userId', '==', '${userId}'), orderBy('date', 'desc')`);
       console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'contests' collection with fields:`);
       console.error(`  - userId (Ascending)`);
       console.error(`  - date (Descending)`);
@@ -129,7 +135,7 @@ export async function getContestsAction(userId: string | null | undefined): Prom
       console.error(error.message);
       console.error(`--------------------------------------------------------------------------------`);
     }
-    return []; // Return empty array on error
+    return []; 
   }
 }
 
@@ -145,7 +151,7 @@ export async function getUpcomingContestsCountAction(userId: string | null | und
     const q = query(
       contestsCollection, 
       where("userId", "==", userId),
-      where("date", ">=", todayTimestamp) // This query also requires an index
+      where("date", ">=", todayTimestamp) 
     );
      console.log(`[getUpcomingContestsCountAction] Constructed Firestore query for upcoming contests (user "${userId}"):`, JSON.stringify({
       collection: 'contests',
@@ -173,3 +179,4 @@ export async function getUpcomingContestsCountAction(userId: string | null | und
     return 0;
   }
 }
+

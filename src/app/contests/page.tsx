@@ -16,17 +16,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ContestsPage() {
   const { user, loading: authLoading } = useAuth();
   const [contests, setContests] = React.useState<ContestDocumentClient[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
+  const [isLoading, setIsLoading] = React.useState(true); 
 
   React.useEffect(() => {
     async function fetchUserContests(currentUserId: string) {
+      console.log("[ContestsPage] useEffect: Auth loaded, user found. Fetching contests for userId:", currentUserId);
       setIsLoading(true);
-      setContests([]); // Clear previous data
+      setContests([]); 
       try {
         const userContests = await getContestsAction(currentUserId);
+        console.log("[ContestsPage] useEffect: getContestsAction returned:", userContests);
         setContests(userContests);
       } catch (error) {
-        console.error("Error fetching contests:", error);
+        console.error("[ContestsPage] useEffect: Error fetching contests:", error);
         setContests([]);
       } finally {
         setIsLoading(false);
@@ -34,6 +36,7 @@ export default function ContestsPage() {
     }
 
     if (authLoading) {
+      console.log("[ContestsPage] useEffect: Auth is loading. Setting isLoading to true.");
       setIsLoading(true);
       setContests([]);
       return;
@@ -42,6 +45,7 @@ export default function ContestsPage() {
     if (user?.uid) {
       fetchUserContests(user.uid);
     } else {
+      console.log("[ContestsPage] useEffect: Auth loaded, but no user. Clearing contests and setting isLoading to false.");
       setContests([]);
       setIsLoading(false);
     }
@@ -67,7 +71,7 @@ export default function ContestsPage() {
     );
   }
 
-  if (!user) { // Auth loaded, no user
+  if (!user) { 
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -77,7 +81,6 @@ export default function ContestsPage() {
     );
   }
 
-  // User is logged in
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -93,7 +96,7 @@ export default function ContestsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-           {isLoading ? ( // Data loading for logged-in user
+           {isLoading ? ( 
              <Skeleton className="h-64 w-full" />
           ) : contests.length > 0 ? (
             <Table>
@@ -141,7 +144,7 @@ export default function ContestsPage() {
                 })}
               </TableBody>
             </Table>
-          ) : ( // User logged in, data loaded, but no contests
+          ) : ( 
              <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center h-60">
               <ListX className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Contests Tracked</h3>
@@ -153,3 +156,4 @@ export default function ContestsPage() {
     </div>
   );
 }
+
