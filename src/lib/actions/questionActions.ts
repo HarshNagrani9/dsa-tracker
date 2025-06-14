@@ -75,6 +75,7 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     revalidatePath('/topics'); // For topic list (question counts) & specific topic pages will refetch
     revalidatePath('/streak'); // For streak display
 
+
     return {
       success: true,
       message: "Question added successfully!",
@@ -105,7 +106,7 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
       questionsCollection,
       where("topicName", "==", topicName),
       where("userId", "==", userId)
-      // orderBy("createdAt", "desc") // Temporarily removed due to index issue, re-add when index is confirmed
+      // orderBy("createdAt", "desc") // Keep commented out or remove if index isn't created for it
     );
 
     console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q);
@@ -221,7 +222,7 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     }
     if (q.platform && platformCounts[q.platform] !== undefined) {
       platformCounts[q.platform]++;
-    } else if (q.platform) {
+    } else if (q.platform) { // Handles any platform not in the explicit list by adding to 'Other'
       platformCounts.Other = (platformCounts.Other || 0) + 1;
     }
   });
@@ -232,11 +233,13 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     fill: `hsl(var(--chart-${index + 1}))`,
   }));
 
+  // Ensure all platforms from constants are represented, even if count is 0
   const finalPlatformData = PLATFORMS.map((plat, index) => ({
     name: plat,
-    count: platformCounts[plat] || 0,
+    count: platformCounts[plat] || 0, 
     fill: `hsl(var(--chart-${(index % 5) + 1}))`,
   }));
+
 
   return {
     difficultyData: finalDifficultyData,
