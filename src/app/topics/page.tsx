@@ -1,24 +1,14 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlusCircle, ListChecks } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { AddTopicForm } from "@/components/topics/AddTopicForm";
+import { ListChecks } from "lucide-react";
 import { getTopicsAction } from '@/lib/actions/topicActions';
 import type { TopicDocument } from '@/lib/types';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AddTopicDialog } from '@/components/topics/AddTopicDialog'; // Import the new client component
 
 export default async function TopicsPage() {
   const topics = await getTopicsAction();
-  // Removed incorrect useState from Server Component
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,29 +52,3 @@ export default async function TopicsPage() {
     </div>
   );
 }
-
-// Client component for the dialog part
-function AddTopicDialog() {
-  const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = React.useState(false);
-  return (
-    <Dialog open={isAddTopicDialogOpen} onOpenChange={setIsAddTopicDialogOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Topic
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add New Topic</DialogTitle>
-          <DialogDescription>
-            Enter the name for the new DSA topic.
-          </DialogDescription>
-        </DialogHeader>
-        <AddTopicForm 
-          onFormSubmitSuccess={() => setIsAddTopicDialogOpen(false)} 
-        />
-      </DialogContent>
-    </Dialog>
-  );
-}
-
