@@ -30,6 +30,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      console.log("AuthProvider: onAuthStateChanged - currentUser:", currentUser);
+      if (currentUser) {
+        console.log("AuthProvider: Current user email:", currentUser.email);
+        console.log("AuthProvider: Current user displayName:", currentUser.displayName);
+        console.log("AuthProvider: Current user photoURL:", currentUser.photoURL);
+        console.log("AuthProvider: Current user UID:", currentUser.uid);
+      }
       setUser(currentUser);
       setLoading(false);
     }, (authError) => {
@@ -51,8 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
+      // provider.addScope('profile'); // Usually not needed, Firebase handles default scopes
+      // provider.addScope('email');   // Usually not needed
       await signInWithPopup(auth, provider);
       // onAuthStateChanged will handle setting the user
+      console.log("AuthProvider: signInWithGoogle - auth.currentUser after popup:", auth.currentUser);
+      if (auth.currentUser) {
+          console.log("AuthProvider: signInWithGoogle - auth.currentUser email:", auth.currentUser.email);
+      }
       toast({
         title: "Signed In",
         description: "Successfully signed in with Google.",
