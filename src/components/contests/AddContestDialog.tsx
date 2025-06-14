@@ -16,6 +16,7 @@ import { AddContestForm } from "@/components/contests/AddContestForm";
 
 export function AddContestDialog() {
   const [isAddContestDialogOpen, setIsAddContestDialogOpen] = React.useState(false);
+  console.log("PLease do it");
   return (
     <Dialog open={isAddContestDialogOpen} onOpenChange={setIsAddContestDialogOpen}>
       <DialogTrigger asChild>
