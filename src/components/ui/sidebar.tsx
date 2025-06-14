@@ -20,10 +20,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-// Added missing import
-import { useSidebar as useInternalSidebarContext } from "./sidebar";
-
-
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
@@ -550,30 +546,25 @@ const SidebarMenuButton = React.forwardRef<
     ref
   ) => {
     const Comp = asChild ? Slot : "button";
-    const { isMobile, state } = useInternalSidebarContext(); // Use the aliased import
+    const { isMobile, state } = useSidebar(); 
 
     const commonElementProps = {
       ref,
-      className: cn(sidebarMenuButtonVariants({ variant, size }), className),
-      ...restProps, // Pass all other props
+      className: cn(sidebarMenuButtonVariants({ variant, size, className })),
     };
-
+    
     let buttonElement;
 
     if (asChild) {
-      // When asChild is true, Comp is Slot.
-      // Slot will merge its props with its direct child.
-      // We explicitly do NOT pass data-sidebar, data-size, data-active to Slot
-      // as they are meant for the button itself, not for arbitrary children.
-      buttonElement = <Comp {...commonElementProps}>{children}</Comp>;
+      buttonElement = <Comp {...commonElementProps} {...restProps}>{children}</Comp>;
     } else {
-      // When Comp is 'button', we add the specific data-* attributes.
       buttonElement = (
         <Comp
           {...commonElementProps}
           data-sidebar="menu-button"
           data-size={size}
           data-active={isActive}
+          {...restProps}
         >
           {children}
         </Comp>
@@ -594,7 +585,7 @@ const SidebarMenuButton = React.forwardRef<
         <TooltipContent
           side="right"
           align="center"
-          hidden={!(isMobile || (!isMobile && state === "collapsed"))} // Show if mobile OR (desktop AND collapsed)
+          hidden={(isMobile || (!isMobile && state === "collapsed")) ? false : true}
           {...tooltipContentProps}
         />
       </Tooltip>

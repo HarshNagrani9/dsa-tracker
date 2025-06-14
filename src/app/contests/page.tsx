@@ -1,22 +1,13 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlusCircle, Trophy, CalendarDays } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { AddContestForm } from "@/components/contests/AddContestForm";
+import { Trophy, CalendarDays } from "lucide-react";
 import { getContestsAction } from '@/lib/actions/contestActions';
 import type { ContestDocumentClient } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { AddContestDialog } from '@/components/contests/AddContestDialog';
 
 export default async function ContestsPage() {
   const contests = await getContestsAction();
@@ -52,12 +43,15 @@ export default async function ContestsPage() {
                   const contestDate = new Date(contest.date);
                   const today = new Date();
                   today.setHours(0,0,0,0);
-                  contestDate.setHours(0,0,0,0);
+                  
+                  // Create a new Date object from contest.date to avoid modifying the original
+                  const normalizedContestDate = new Date(contest.date);
+                  normalizedContestDate.setHours(0,0,0,0);
 
                   let status: "Upcoming" | "Past" | "Today" = "Upcoming";
-                  if (contestDate < today) {
+                  if (normalizedContestDate < today) {
                     status = "Past";
-                  } else if (contestDate.getTime() === today.getTime()) {
+                  } else if (normalizedContestDate.getTime() === today.getTime()) {
                     status = "Today";
                   }
 
@@ -90,29 +84,5 @@ export default async function ContestsPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function AddContestDialog() {
-  const [isAddContestDialogOpen, setIsAddContestDialogOpen] = React.useState(false);
-  return (
-    <Dialog open={isAddContestDialogOpen} onOpenChange={setIsAddContestDialogOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Contest
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[625px]">
-        <DialogHeader>
-          <DialogTitle>Add New Contest</DialogTitle>
-          <DialogDescription>
-            Fill in the details for the new coding contest.
-          </DialogDescription>
-        </DialogHeader>
-        <AddContestForm 
-          onFormSubmitSuccess={() => setIsAddContestDialogOpen(false)} 
-        />
-      </DialogContent>
-    </Dialog>
   );
 }

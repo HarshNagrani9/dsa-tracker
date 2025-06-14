@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -45,6 +46,11 @@ const ChartContainer = React.forwardRef<
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
   const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+  const [isMounted, setIsMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -57,10 +63,17 @@ const ChartContainer = React.forwardRef<
         )}
         {...props}
       >
-        <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        {isMounted ? (
+          <>
+            <ChartStyle id={chartId} config={config} />
+            <RechartsPrimitive.ResponsiveContainer>
+              {children}
+            </RechartsPrimitive.ResponsiveContainer>
+          </>
+        ) : (
+          // Placeholder to maintain layout during SSR and before client mount
+          <div style={{ width: '100%', height: '100%' }} aria-hidden="true" />
+        )}
       </div>
     </ChartContext.Provider>
   )
