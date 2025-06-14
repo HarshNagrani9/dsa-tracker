@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -30,7 +31,7 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
         
         return (
           <SidebarMenuItem key={index}>
-            <Link href={item.disabled ? "#" : item.href} legacyBehavior passHref>
+            <Link href={item.disabled ? "#" : item.href}>
               <SidebarMenuButton
                 asChild
                 variant="default"
@@ -44,13 +45,13 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
                 onClick={onLinkClick}
                 tooltip={{content: item.title, side: "right", align: "center"}}
               >
-                <a>
+                <>
                   <Icon />
                   <span>{item.title}</span>
                   {item.label && (
                     <span className="ml-auto text-xs">{item.label}</span>
                   )}
-                </a>
+                </>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
@@ -59,3 +60,4 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
     </SidebarMenu>
   );
 }
+
