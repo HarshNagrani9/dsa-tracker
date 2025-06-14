@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink, ListFilter, User, AlertTriangle, ListX } from 'lucide-react';
+import { ArrowLeft, ExternalLink, User, AlertTriangle, ListX, FolderX } from 'lucide-react';
 import { format } from 'date-fns';
 import type { QuestionDocument, TopicDocument } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
@@ -22,7 +22,8 @@ interface TopicDetailPageProps {
 }
 
 export default function TopicDetailPage({ params }: TopicDetailPageProps) {
-  const { topicId } = params;
+  const resolvedParams = React.use(params);
+  const { topicId } = resolvedParams;
   const { user, loading: authLoading } = useAuth();
   
   const [topic, setTopic] = React.useState<TopicDocument | null>(null);
