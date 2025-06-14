@@ -4,7 +4,7 @@
 import type { AddQuestionFormInput, QuestionDocument } from '@/lib/types';
 import { AddQuestionSchema } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore'; // orderBy import removed if not used
+import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -26,7 +26,6 @@ const parseTimestampToDate = (timestampField: any): Date => {
       return parsedDate;
     }
   }
-  // console.warn('Unparseable date encountered in parseTimestampToDate, returning current date as fallback:', timestampField);
   return new Date();
 };
 
@@ -50,13 +49,11 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
       updatedAt: serverTimestamp(),
     };
 
-    const docRef = await addDoc(collection(db, "questions"), questionData);
-    // console.log("Document written with ID: ", docRef.id);
+    await addDoc(collection(db, "questions"), questionData);
 
     revalidatePath('/questions');
     revalidatePath('/');
     revalidatePath('/topics');
-    // No need to revalidate specific topicId page here, /topics covers list counts.
 
     return {
       success: true,
@@ -79,14 +76,14 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 export async function getQuestionsByTopicNameAction(topicName: string): Promise<QuestionDocument[]> {
   try {
     const questionsCollection = collection(db, "questions");
-    // The query is simplified to only filter by topicName.
-    // Sorting by createdAt (desc) was removed to avoid the "index required" error.
-    // For sorted results, the composite index (topicName ASC, createdAt DESC) must be created in Firestore.
     const q = query(
       questionsCollection,
       where("topicName", "==", topicName)
-      // orderBy("createdAt", "desc") // THIS LINE IS INTENTIONALLY REMOVED
+      // orderBy("createdAt", "desc") // Ensure this is commented out or removed if index isn't created
     );
+
+    console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}":`, q);
+
     const querySnapshot = await getDocs(q);
 
     const questions = querySnapshot.docs.map(doc => {
@@ -108,9 +105,13 @@ export async function getQuestionsByTopicNameAction(topicName: string): Promise<
   } catch (error) {
     console.error(`Error fetching questions for topic "${topicName}": `, error);
     if (error instanceof Error && error.message.includes("query requires an index")) {
-      console.error(`Firestore query for topic "${topicName}" requires an index. Please create it in the Firebase console using the link provided in the original error message or logs.`);
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for topic "${topicName}"`);
+      console.error(`To fix this, create the index in your Firebase Console.`);
+      console.error(`The error message usually provides a direct link. If not, you need to create a composite index on the 'questions' collection with 'topicName' (Ascending) and potentially 'createdAt' (Descending if you want sorting).`);
+      console.error(`Original error: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
     }
     return [];
   }
 }
-
