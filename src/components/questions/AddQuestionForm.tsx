@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -62,15 +63,15 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
         onFormSubmitSuccess();
       } else {
         toast({
-          title: 'Error',
-          description: result.message || 'Failed to add question.',
+          title: result.message || 'Error Adding Question',
+          description: result.error || 'An error occurred. Please try again.',
           variant: 'destructive',
         });
       }
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred.',
+        description: 'An unexpected client-side error occurred.',
         variant: 'destructive',
       });
     } finally {
