@@ -1,7 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { BarChart as BarChartIcon, LineChart as LineChartIcon, PieChartIcon as PieChartIconLucide, Activity, CalendarClock } from "lucide-react";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import type { QuestionDocument, Difficulty, Platform } from "@/lib/types";
 import { DIFFICULTIES, PLATFORMS } from "@/lib/constants";
@@ -12,7 +12,9 @@ import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 async function getTotalQuestionsSolved(): Promise<number> {
   try {
     const questionsCollection = collection(db, "questions");
-    const querySnapshot = await getDocs(questionsCollection);
+    // Added orderBy for consistency, though size is the main interest
+    const q = query(questionsCollection, orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
     return querySnapshot.size;
   } catch (error) {
     console.error("Error fetching total questions solved:", error);
@@ -20,14 +22,11 @@ async function getTotalQuestionsSolved(): Promise<number> {
   }
 }
 
-// Using the new action
-// async function getUpcomingContestsCount(): Promise<number> {
-//   return getUpcomingContestsCountAction();
-// }
-
 async function getCurrentStreak(): Promise<number> {
   // TODO: Implement actual streak calculation from an 'activityLog' collection.
   // This would involve checking consecutive days with logged activity.
+  // For now, this is a placeholder.
+  console.log("Streak calculation needs to be implemented with actual data source.");
   return 0; // Placeholder
 }
 
@@ -38,7 +37,8 @@ async function getQuestionAggregates(): Promise<{
   let questions: Partial<QuestionDocument>[] = [];
   try {
     const questionsCollection = collection(db, "questions");
-    const querySnapshot = await getDocs(questionsCollection);
+    const q = query(questionsCollection, orderBy("createdAt", "desc")); // Added orderBy
+    const querySnapshot = await getDocs(q);
     questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
   } catch (error) {
     console.error("Error fetching questions for aggregation:", error);
@@ -55,7 +55,7 @@ async function getQuestionAggregates(): Promise<{
     }
     if (q.platform && platformCounts[q.platform] !== undefined) {
       platformCounts[q.platform]++;
-    } else if (q.platform) { // Handles platforms not in predefined list if data source changes
+    } else if (q.platform) { 
       platformCounts.Other = (platformCounts.Other || 0) + 1;
     }
   });
@@ -68,7 +68,7 @@ async function getQuestionAggregates(): Promise<{
   
   const finalPlatformData = PLATFORMS.map((plat, index) => ({
     name: plat,
-    count: platformCounts[plat] || 0, // ensure count is 0 if no questions for that platform
+    count: platformCounts[plat] || 0, 
     fill: `hsl(var(--chart-${(index % 5) + 1}))`,
   }));
 
@@ -78,7 +78,7 @@ async function getQuestionAggregates(): Promise<{
 
 export default async function DashboardPage() {
   const totalSolved = await getTotalQuestionsSolved();
-  const upcomingContests = await getUpcomingContestsCountAction(); // Using action
+  const upcomingContests = await getUpcomingContestsCountAction();
   const currentStreak = await getCurrentStreak();
   const { difficultyData, platformData } = await getQuestionAggregates();
 
