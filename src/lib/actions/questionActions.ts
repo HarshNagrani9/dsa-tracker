@@ -66,14 +66,13 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
       await updateStreakOnActivityAction(validationResult.data.userId);
     } catch (streakError) {
       console.error("Error updating streak data after adding question: ", streakError);
-      // Do not let streak error block main success path
     }
 
-    // Revalidate paths
-    revalidatePath('/'); // For dashboard aggregates
-    revalidatePath('/questions'); // For the main questions list
-    revalidatePath('/topics'); // For topic list (question counts) & specific topic pages will refetch
-    revalidatePath('/streak'); // For streak display
+    revalidatePath('/'); 
+    revalidatePath('/questions'); 
+    revalidatePath('/topics'); 
+    // No longer revalidating specific topic detail page here, it will refetch on navigation.
+    revalidatePath('/streak'); 
 
 
     return {
@@ -106,10 +105,11 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
       questionsCollection,
       where("topicName", "==", topicName),
       where("userId", "==", userId)
-      // orderBy("createdAt", "desc") // Keep commented out or remove if index isn't created for it
+      // orderBy("createdAt", "desc") // Removed to simplify, requires index: topicName (ASC), userId (ASC), createdAt (DESC)
+                                     // or topicName (ASC), userId (ASC) and then client-side sort.
     );
 
-    console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q);
+    console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q.type, q);
 
     const querySnapshot = await getDocs(q);
     console.log(`[getQuestionsByTopicNameAction] Found ${querySnapshot.size} questions for topic "${topicName}", userId: ${userId}`);
@@ -135,12 +135,11 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
     console.error(`[getQuestionsByTopicNameAction] Error fetching questions for topic "${topicName}", user "${userId}": `, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
-      console.error(`FIRESTORE INDEX REQUIRED for topic "${topicName}" and user "${userId}"`);
-      console.error(`To fix this, create the composite index in your Firebase Console for the 'questions' collection.`);
-      console.error(`Fields for index: topicName (ASC), userId (ASC), createdAt (DESC) - if re-adding sort.`);
-      console.error(`Alternatively: topicName (ASC), userId (ASC) if no sorting on createdAt.`);
-      console.error(`The error message usually provides a direct link. If not, you need to manually create it.`);
-      console.error(`Original error: ${error.message}`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection for Topic Detail Page.`);
+      console.error(`Needed for query: where("topicName", "==", "${topicName}") AND where("userId", "==", "${userId}").`);
+      console.error(`Suggested index fields: topicName (ASC), userId (ASC)`);
+      console.error(`Or: userId (ASC), topicName (ASC)`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
     }
     return [];
@@ -157,9 +156,10 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     const questionsCollection = collection(db, "questions");
     const q = query(
       questionsCollection,
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc")
+      where("userId", "==", userId)
+      // orderBy("createdAt", "desc") // Temporarily removed. Requires composite index: userId (ASC), createdAt (DESC)
     );
+    console.log(`[getAllQuestionsAction] Constructed Firestore query for user "${userId}":`, q.type, q);
     const querySnapshot = await getDocs(q);
     console.log(`[getAllQuestionsAction] Found ${querySnapshot.size} questions for userId: ${userId}`);
 
@@ -182,7 +182,16 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     return questions;
   } catch (error) {
     console.error(`[getAllQuestionsAction] Error fetching all questions for user ${userId}:`, error);
-    return [];
+    if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection to list all questions for a user.`);
+      console.error(`This usually occurs if you try to order by a field (e.g. 'createdAt') while filtering by 'userId'.`);
+      console.error(`Suggested index fields (if ordering by createdAt): userId (ASC), createdAt (DESC)`);
+      console.error(`If not ordering, a simple query by 'userId' usually doesn't require a custom index if it's a basic equality check, but Firestore's behavior can vary.`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
+    return []; 
   }
 }
 
@@ -201,12 +210,20 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
   let questions: Partial<QuestionDocument>[] = [];
   try {
     const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, where("userId", "==", userId)); // No orderBy needed for aggregation
+    const q = query(questionsCollection, where("userId", "==", userId)); 
     const querySnapshot = await getDocs(q);
     questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
     console.log(`[getQuestionAggregatesAction] Found ${questions.length} questions to aggregate for userId: ${userId}`);
   } catch (error) {
     console.error(`[getQuestionAggregatesAction] Error fetching questions for aggregation (userId: ${userId}):`, error);
+      if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection for aggregating dashboard data.`);
+      console.error(`Query involved: where("userId", "==", "${userId}").`);
+      console.error(`A simple equality query on 'userId' might sometimes need an index depending on Firestore's planner or if other implicit sorts are involved.`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
   }
 
   const { DIFFICULTIES, PLATFORMS } = await import('@/lib/constants');
@@ -222,7 +239,7 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     }
     if (q.platform && platformCounts[q.platform] !== undefined) {
       platformCounts[q.platform]++;
-    } else if (q.platform) { // Handles any platform not in the explicit list by adding to 'Other'
+    } else if (q.platform) { 
       platformCounts.Other = (platformCounts.Other || 0) + 1;
     }
   });
@@ -233,7 +250,6 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     fill: `hsl(var(--chart-${index + 1}))`,
   }));
 
-  // Ensure all platforms from constants are represented, even if count is 0
   const finalPlatformData = PLATFORMS.map((plat, index) => ({
     name: plat,
     count: platformCounts[plat] || 0, 
@@ -247,4 +263,5 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     totalSolved: questions.length
   };
 }
+    
     

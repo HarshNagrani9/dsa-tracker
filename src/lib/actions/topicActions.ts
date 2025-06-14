@@ -73,15 +73,21 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
 }
 
 export async function getTopicsAction(userId: string | null | undefined): Promise<TopicDocument[]> {
-  if (!userId) return [];
+  if (!userId) {
+    console.log("[getTopicsAction] No userId provided, returning empty array.");
+    return [];
+  }
+  console.log(`[getTopicsAction] Fetching topics for userId: ${userId}`);
   try {
     const topicsCollectionRef = collection(db, 'topics');
     const topicsQuery = query(
       topicsCollectionRef, 
       where('userId', '==', userId),
-      orderBy('name', 'asc')
+      orderBy('name', 'asc') 
     );
+    console.log(`[getTopicsAction] Constructed Firestore query for topics (user "${userId}"):`, topicsQuery.type, topicsQuery);
     const topicsSnapshot = await getDocs(topicsQuery);
+    console.log(`[getTopicsAction] Found ${topicsSnapshot.size} topics for userId: ${userId}`);
 
     const topicsData: TopicDocument[] = [];
 
@@ -108,14 +114,29 @@ export async function getTopicsAction(userId: string | null | undefined): Promis
     }
     return topicsData;
   } catch (error) {
-    console.error('Error fetching topics with question counts:', error);
+    console.error(`[getTopicsAction] Error fetching topics for user ${userId}:`, error);
+    if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'topics' or 'questions' collection during getTopicsAction.`);
+      console.error(`For 'topics' query (where('userId', '==', userId), orderBy('name', 'asc')):`);
+      console.error(`  - Suggested index: userId (ASC), name (ASC) on 'topics' collection.`);
+      console.error(`For 'questions' query (where("topicName", "==", topicName), where("userId", "==", userId)) for counts:`);
+      console.error(`  - Suggested index: topicName (ASC), userId (ASC) on 'questions' collection.`);
+      console.error(`  - Or: userId (ASC), topicName (ASC) on 'questions' collection.`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
     return [];
   }
 }
 
 
 export async function getTopicByIdAction(topicId: string, userId: string | null | undefined): Promise<TopicDocument | null> {
-  if (!userId) return null;
+  if (!userId) {
+     console.log("[getTopicByIdAction] No userId provided, returning null.");
+    return null;
+  }
+  console.log(`[getTopicByIdAction] Fetching topic by ID "${topicId}" for userId: ${userId}`);
   try {
     const topicDocRef = doc(db, 'topics', topicId);
     const topicDocSnap = await getDoc(topicDocRef);
@@ -123,8 +144,8 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
     if (topicDocSnap.exists()) {
       const data = topicDocSnap.data() as DocumentData;
       if (data.userId !== userId) {
-        console.log("User not authorized to view this topic.");
-        return null; // Or throw an error
+        console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${topicId} owned by ${data.userId}.`);
+        return null; 
       }
       return {
         id: topicDocSnap.id,
@@ -134,11 +155,15 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
         updatedAt: parseTimestampToDate(data.updatedAt),
       };
     } else {
-      console.log("No such topic document!");
+      console.log(`[getTopicByIdAction] No such topic document with ID: ${topicId}`);
       return null;
     }
   } catch (error) {
-    console.error('Error fetching topic by ID:', error);
+    console.error(`[getTopicByIdAction] Error fetching topic by ID ${topicId} for user ${userId}:`, error);
+    // No specific index error check here as it's a direct doc get, permissions are more likely.
     return null;
   }
 }
+
+
+    
