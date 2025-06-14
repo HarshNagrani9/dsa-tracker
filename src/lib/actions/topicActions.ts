@@ -3,7 +3,7 @@
 
 import { db } from '@/lib/firebase/config';
 import { AddTopicSchema, type AddTopicFormInput, type TopicDocument } from '@/lib/types';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, doc, getDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -11,6 +11,25 @@ interface ActionResult {
   message: string;
   error?: string | null;
 }
+
+const parseTimestampToDate = (timestampField: any): Date => {
+  if (timestampField instanceof Timestamp) {
+    return timestampField.toDate();
+  }
+  if (timestampField instanceof Date) {
+    return timestampField;
+  }
+  // Attempt to parse if it's a string or number representation of a date
+  if (typeof timestampField === 'string' || typeof timestampField === 'number') {
+    const parsedDate = new Date(timestampField);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+  }
+  // Fallback for unhandled or invalid types
+  return new Date(); 
+};
+
 
 export async function addTopicAction(data: AddTopicFormInput): Promise<ActionResult> {
   const validationResult = AddTopicSchema.safeParse(data);
@@ -32,7 +51,7 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
     };
     await addDoc(collection(db, 'topics'), topicData);
     revalidatePath('/topics');
-    revalidatePath('/'); // If topics affect dashboard, e.g. topic dropdowns for filtering
+    revalidatePath('/'); 
     return {
       success: true,
       message: 'Topic added successfully!',
@@ -53,38 +72,57 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
 
 export async function getTopicsAction(): Promise<TopicDocument[]> {
   try {
-    const topicsCollection = collection(db, 'topics');
-    const q = query(topicsCollection, orderBy('name', 'asc'));
-    const querySnapshot = await getDocs(q);
+    const topicsCollectionRef = collection(db, 'topics');
+    const topicsQuery = query(topicsCollectionRef, orderBy('name', 'asc'));
+    const topicsSnapshot = await getDocs(topicsQuery);
 
-    const parseTimestampToDate = (timestampField: any): Date => {
-      if (timestampField instanceof Timestamp) {
-        return timestampField.toDate();
-      }
-      if (timestampField instanceof Date) {
-        return timestampField;
-      }
-      if (typeof timestampField === 'string' || typeof timestampField === 'number') {
-        const parsedDate = new Date(timestampField);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
-        }
-      }
-      // Fallback for unhandled or invalid types
-      return new Date(); 
-    };
+    const topicsData: TopicDocument[] = [];
 
-    return querySnapshot.docs.map(doc => {
-      const data = doc.data();
+    for (const topicDoc of topicsSnapshot.docs) {
+      const topic = topicDoc.data();
+      const topicName = topic.name;
+
+      // Query for questions count for this topic
+      const questionsQuery = query(collection(db, "questions"), where("topicName", "==", topicName));
+      const questionsSnapshot = await getDocs(questionsQuery);
+      const questionCount = questionsSnapshot.size;
+
+      topicsData.push({
+        id: topicDoc.id,
+        name: topicName,
+        createdAt: parseTimestampToDate(topic.createdAt),
+        updatedAt: parseTimestampToDate(topic.updatedAt),
+        questionCount: questionCount,
+      });
+    }
+    return topicsData;
+  } catch (error) {
+    console.error('Error fetching topics with question counts:', error);
+    return [];
+  }
+}
+
+
+export async function getTopicByIdAction(topicId: string): Promise<TopicDocument | null> {
+  try {
+    const topicDocRef = doc(db, 'topics', topicId);
+    const topicDocSnap = await getDoc(topicDocRef);
+
+    if (topicDocSnap.exists()) {
+      const data = topicDocSnap.data();
       return {
-        id: doc.id,
+        id: topicDocSnap.id,
         name: data.name,
         createdAt: parseTimestampToDate(data.createdAt),
         updatedAt: parseTimestampToDate(data.updatedAt),
+        // questionCount is not typically fetched here, but could be if needed
       };
-    });
+    } else {
+      console.log("No such topic document!");
+      return null;
+    }
   } catch (error) {
-    console.error('Error fetching topics:', error);
-    return [];
+    console.error('Error fetching topic by ID:', error);
+    return null;
   }
 }

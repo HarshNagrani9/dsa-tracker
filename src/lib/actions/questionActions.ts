@@ -1,10 +1,10 @@
 
 'use server';
 
-import type { AddQuestionFormInput } from '@/lib/types';
+import type { AddQuestionFormInput, QuestionDocument } from '@/lib/types';
 import { AddQuestionSchema } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -12,6 +12,22 @@ interface ActionResult {
   message: string;
   error?: string | null; 
 }
+
+const parseTimestampToDate = (timestampField: any): Date => {
+  if (timestampField instanceof Timestamp) {
+    return timestampField.toDate();
+  }
+  if (timestampField instanceof Date) {
+    return timestampField;
+  }
+  if (typeof timestampField === 'string' || typeof timestampField === 'number') {
+    const parsedDate = new Date(timestampField);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+  }
+  return new Date(); 
+};
 
 export async function addQuestionAction(data: AddQuestionFormInput): Promise<ActionResult> {
   const validationResult = AddQuestionSchema.safeParse(data);
@@ -36,8 +52,14 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     const docRef = await addDoc(collection(db, "questions"), questionData);
     console.log("Document written with ID: ", docRef.id);
 
-    revalidatePath('/questions'); // Revalidate the questions page
-    revalidatePath('/'); // Revalidate the dashboard page
+    revalidatePath('/questions'); 
+    revalidatePath('/'); 
+    revalidatePath('/topics'); // Revalidate topics page as question counts might change
+    if (validationResult.data.topicName) {
+        // Potentially revalidate specific topic page if IDs were used for routes
+        // For now, revalidating /topics is a broader approach.
+    }
+
 
     return {
       success: true,
@@ -51,9 +73,40 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     }
     return {
       success: false,
-      message: "Error adding question.", // Generic message for toast title
-      error: errorMessage, // Specific error for toast description
+      message: "Error adding question.", 
+      error: errorMessage, 
     };
   }
 }
 
+export async function getQuestionsByTopicNameAction(topicName: string): Promise<QuestionDocument[]> {
+  try {
+    const questionsCollection = collection(db, "questions");
+    const q = query(
+      questionsCollection, 
+      where("topicName", "==", topicName),
+      orderBy("createdAt", "desc")
+    );
+    const querySnapshot = await getDocs(q);
+    
+    const questions = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        title: data.title || '',
+        link: data.link || '',
+        description: data.description || '',
+        difficulty: data.difficulty || 'Easy', 
+        platform: data.platform || 'Other', 
+        topicName: data.topicName || '',
+        comments: data.comments || '',
+        createdAt: parseTimestampToDate(data.createdAt),
+        updatedAt: parseTimestampToDate(data.updatedAt),
+      } as QuestionDocument;
+    });
+    return questions;
+  } catch (error) {
+    console.error(`Error fetching questions for topic "${topicName}": `, error);
+    return []; 
+  }
+}

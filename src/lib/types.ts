@@ -21,6 +21,7 @@ export interface TopicDocument extends AddTopicFormInput {
   id: string;
   createdAt: Date;
   updatedAt: Date;
+  questionCount?: number; // Added for displaying question count per topic
 }
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
