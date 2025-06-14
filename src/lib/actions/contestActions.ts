@@ -25,6 +25,8 @@ const parseTimestampToDate = (timestampField: any): Date => {
       return parsedDate;
     }
   }
+  // Fallback to current date if parsing fails, though ideally, this shouldn't be hit with valid Firestore data
+  console.warn(`[parseTimestampToDate] Failed to parse timestamp:`, timestampField, `Returning current date.`);
   return new Date(); 
 };
 
@@ -55,8 +57,8 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
       updatedAt: serverTimestamp() as Timestamp,
     };
     await addDoc(collection(db, 'contests'), contestData);
-    revalidatePath('/contests');
-    revalidatePath('/'); 
+    revalidatePath('/contests'); // For the contests list page
+    revalidatePath('/'); // For dashboard upcoming contests count
     return {
       success: true,
       message: 'Contest added successfully!',
@@ -66,7 +68,7 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
     if (e instanceof Error) {
       errorMessage = e.message;
     }
-    console.error("Error adding contest to Firestore: ", e);
+    console.error("[addContestAction] Error adding contest to Firestore: ", e);
     return {
       success: false,
       message: 'Error adding contest.',
@@ -86,14 +88,18 @@ export async function getContestsAction(userId: string | null | undefined): Prom
     const q = query(
       contestsCollection, 
       where('userId', '==', userId),
-      orderBy('date', 'desc')
+      orderBy('date', 'desc') // This ordering requires a composite index
     );
-    console.log(`[getContestsAction] Constructed Firestore query for contests (user "${userId}"):`, JSON.stringify(q, null, 2));
+    console.log(`[getContestsAction] Constructed Firestore query for contests (user "${userId}"):`, JSON.stringify({
+      collection: 'contests',
+      filters: [{ field: 'userId', op: '==', value: userId }],
+      orderBy: [{ field: 'date', direction: 'desc' }]
+    }, null, 2));
 
     const querySnapshot = await getDocs(q);
-    console.log(`[getContestsAction] Found ${querySnapshot.size} contests for userId: ${userId}`);
+    console.log(`[getContestsAction] Firestore query executed. Found ${querySnapshot.size} contests for userId: ${userId}.`);
 
-    return querySnapshot.docs.map(doc => {
+    const contests = querySnapshot.docs.map(doc => {
       const data = doc.data() as DocumentData; 
       return {
         id: doc.id,
@@ -107,22 +113,29 @@ export async function getContestsAction(userId: string | null | undefined): Prom
         updatedAt: parseTimestampToDate(data.updatedAt),
       } as ContestDocumentClient; 
     });
+    console.log(`[getContestsAction] Successfully mapped ${contests.length} contests.`);
+    return contests;
+
   } catch (error) {
     console.error(`[getContestsAction] Error fetching contests for user ${userId}:`, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
-      console.error(`FIRESTORE INDEX REQUIRED for 'contests' collection for Contest Page.`);
+      console.error(`!!! FIRESTORE INDEX REQUIRED for 'contests' collection for Contest Page !!!`);
       console.error(`Query involved: where('userId', '==', '${userId}'), orderBy('date', 'desc')`);
-      console.error(`Suggested index fields: userId (ASC), date (DESC) on 'contests' collection.`);
-      console.error(`The error message usually provides a direct link to create it in the Firebase console: ${error.message}`);
+      console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'contests' collection with fields:`);
+      console.error(`  - userId (Ascending)`);
+      console.error(`  - date (Descending)`);
+      console.error(`The error message usually provides a direct link to create it in the Firebase console. Check the full error message below:`);
+      console.error(error.message);
       console.error(`--------------------------------------------------------------------------------`);
     }
-    return [];
+    return []; // Return empty array on error
   }
 }
 
 export async function getUpcomingContestsCountAction(userId: string | null | undefined): Promise<number> {
   if (!userId) return 0;
+  console.log(`[getUpcomingContestsCountAction] Fetching upcoming contests count for userId: ${userId}`);
   try {
     const contestsCollection = collection(db, "contests");
     const today = new Date();
@@ -132,18 +145,29 @@ export async function getUpcomingContestsCountAction(userId: string | null | und
     const q = query(
       contestsCollection, 
       where("userId", "==", userId),
-      where("date", ">=", todayTimestamp)
+      where("date", ">=", todayTimestamp) // This query also requires an index
     );
+     console.log(`[getUpcomingContestsCountAction] Constructed Firestore query for upcoming contests (user "${userId}"):`, JSON.stringify({
+      collection: 'contests',
+      filters: [
+        { field: 'userId', op: '==', value: userId },
+        { field: 'date', op: '>=', value: todayTimestamp.toDate().toISOString() }
+      ]
+    }, null, 2));
     const querySnapshot = await getDocs(q);
+    console.log(`[getUpcomingContestsCountAction] Firestore query executed. Found ${querySnapshot.size} upcoming contests for userId: ${userId}.`);
     return querySnapshot.size;
   } catch (error) {
-    console.error("Error fetching upcoming contests count:", error);
+    console.error("[getUpcomingContestsCountAction] Error fetching upcoming contests count:", error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
-      console.error(`FIRESTORE INDEX REQUIRED for 'contests' collection for upcoming contests count.`);
+      console.error(`!!! FIRESTORE INDEX REQUIRED for 'contests' collection for upcoming contests count (Dashboard) !!!`);
       console.error(`Query involved: where('userId', '==', '${userId}'), where('date', '>=', today)`);
-      console.error(`Suggested index fields: userId (ASC), date (ASC) on 'contests' collection.`);
-      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'contests' collection with fields:`);
+      console.error(`  - userId (Ascending)`);
+      console.error(`  - date (Ascending)`);
+      console.error(`The error message usually provides a direct link. Check the full error message below:`);
+      console.error(error.message);
       console.error(`--------------------------------------------------------------------------------`);
     }
     return 0;

@@ -25,6 +25,7 @@ const parseTimestampToDate = (timestampField: any): Date => {
       return parsedDate;
     }
   }
+  console.warn(`[parseTimestampToDate] Failed to parse timestamp:`, timestampField, `Returning current date.`);
   return new Date(); 
 };
 
@@ -45,6 +46,22 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
   }
 
   try {
+    // Check if topic already exists for this user to prevent duplicates
+    const topicsCollectionRef = collection(db, 'topics');
+    const existingTopicQuery = query(
+      topicsCollectionRef,
+      where('name', '==', validationResult.data.name),
+      where('userId', '==', validationResult.data.userId)
+    );
+    const existingTopicSnapshot = await getDocs(existingTopicQuery);
+    if (!existingTopicSnapshot.empty) {
+      return {
+        success: false,
+        message: 'Topic already exists.',
+        error: `A topic with the name "${validationResult.data.name}" already exists for this user.`,
+      };
+    }
+
     const topicData = {
       name: validationResult.data.name,
       userId: validationResult.data.userId,
@@ -52,8 +69,8 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
       updatedAt: serverTimestamp(),
     };
     await addDoc(collection(db, 'topics'), topicData);
-    revalidatePath('/topics');
-    revalidatePath('/'); 
+    revalidatePath('/topics'); // For the topics list page
+    revalidatePath('/'); // For dashboard if it uses topic data (indirectly via questions)
     return {
       success: true,
       message: 'Topic added successfully!',
@@ -63,7 +80,21 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
     if (e instanceof Error) {
       errorMessage = e.message;
     }
-    console.error("Error adding topic to Firestore: ", e);
+    console.error("[addTopicAction] Error adding topic to Firestore: ", e);
+    if (e instanceof Error && (e.message.includes("query requires an index") || e.message.includes("needs an index"))) {
+       console.error(`--------------------------------------------------------------------------------`);
+      console.error(`!!! FIRESTORE INDEX REQUIRED for 'topics' collection for checking existing topic in addTopicAction !!!`);
+      console.error(`Query involved: where('name', '==', '${validationResult.data.name}'), where('userId', '==', '${validationResult.data.userId}')`);
+      console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'topics' collection with fields:`);
+      console.error(`  - name (Ascending)`);
+      console.error(`  - userId (Ascending)`);
+      console.error(`OR:`);
+      console.error(`  - userId (Ascending)`);
+      console.error(`  - name (Ascending)`);
+      console.error(`The error message usually provides a direct link. Check the full error message below:`);
+      console.error(e.message);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
     return {
       success: false,
       message: 'Error adding topic.',
@@ -83,25 +114,50 @@ export async function getTopicsAction(userId: string | null | undefined): Promis
     const topicsQuery = query(
       topicsCollectionRef, 
       where('userId', '==', userId),
-      orderBy('name', 'asc') 
+      orderBy('name', 'asc') // Requires index: userId ASC, name ASC
     );
-    console.log(`[getTopicsAction] Constructed Firestore query for topics (user "${userId}"):`, topicsQuery.type, topicsQuery);
+    console.log(`[getTopicsAction] Constructed Firestore query for topics (user "${userId}"):`, JSON.stringify({
+      collection: 'topics',
+      filters: [{ field: 'userId', op: '==', value: userId }],
+      orderBy: [{ field: 'name', direction: 'asc' }]
+    }, null, 2));
     const topicsSnapshot = await getDocs(topicsQuery);
-    console.log(`[getTopicsAction] Found ${topicsSnapshot.size} topics for userId: ${userId}`);
+    console.log(`[getTopicsAction] Firestore query for topics executed. Found ${topicsSnapshot.size} topics for userId: ${userId}`);
 
     const topicsData: TopicDocument[] = [];
 
     for (const topicDoc of topicsSnapshot.docs) {
       const topic = topicDoc.data() as DocumentData;
       const topicName = topic.name;
+      let questionCount = 0;
+      try {
+        const questionsQuery = query(
+          collection(db, "questions"), 
+          where("topicName", "==", topicName),
+          where("userId", "==", userId) // Requires index on questions: topicName ASC, userId ASC (or vice-versa)
+        );
+        // console.log(`[getTopicsAction] Querying question count for topic "${topicName}", user "${userId}"`);
+        const questionsSnapshot = await getDocs(questionsQuery);
+        questionCount = questionsSnapshot.size;
+        // console.log(`[getTopicsAction] Found ${questionCount} questions for topic "${topicName}"`);
+      } catch (qcError) {
+        console.error(`[getTopicsAction] Error fetching question count for topic "${topicName}", user "${userId}":`, qcError);
+        if (qcError instanceof Error && (qcError.message.includes("query requires an index") || qcError.message.includes("needs an index"))) {
+          console.error(`--------------------------------------------------------------------------------`);
+          console.error(`!!! FIRESTORE INDEX REQUIRED for 'questions' collection for Topic Question Counts !!!`);
+          console.error(`Query involved: where("topicName", "==", "${topicName}"), where("userId", "==", "${userId}")`);
+          console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'questions' collection with fields:`);
+          console.error(`  - topicName (Ascending)`);
+          console.error(`  - userId (Ascending)`);
+          console.error(`OR:`);
+          console.error(`  - userId (Ascending)`);
+          console.error(`  - topicName (Ascending)`);
+          console.error(`The error message usually provides a direct link. Check the full error message below:`);
+          console.error(qcError.message);
+          console.error(`--------------------------------------------------------------------------------`);
+        }
+      }
 
-      const questionsQuery = query(
-        collection(db, "questions"), 
-        where("topicName", "==", topicName),
-        where("userId", "==", userId)
-      );
-      const questionsSnapshot = await getDocs(questionsQuery);
-      const questionCount = questionsSnapshot.size;
 
       topicsData.push({
         id: topicDoc.id,
@@ -112,18 +168,19 @@ export async function getTopicsAction(userId: string | null | undefined): Promis
         questionCount: questionCount,
       });
     }
+    console.log(`[getTopicsAction] Successfully mapped ${topicsData.length} topics with question counts.`);
     return topicsData;
   } catch (error) {
     console.error(`[getTopicsAction] Error fetching topics for user ${userId}:`, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
-      console.error(`FIRESTORE INDEX REQUIRED for 'topics' or 'questions' collection during getTopicsAction.`);
-      console.error(`For 'topics' query (where('userId', '==', userId), orderBy('name', 'asc')):`);
-      console.error(`  - Suggested index: userId (ASC), name (ASC) on 'topics' collection.`);
-      console.error(`For 'questions' query (where("topicName", "==", topicName), where("userId", "==", userId)) for counts:`);
-      console.error(`  - Suggested index: topicName (ASC), userId (ASC) on 'questions' collection.`);
-      console.error(`  - Or: userId (ASC), topicName (ASC) on 'questions' collection.`);
-      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`!!! FIRESTORE INDEX REQUIRED for 'topics' collection for Topics Page !!!`);
+      console.error(`Query involved: where('userId', '==', '${userId}'), orderBy('name', 'asc')`);
+      console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'topics' collection with fields:`);
+      console.error(`  - userId (Ascending)`);
+      console.error(`  - name (Ascending)`);
+      console.error(`The error message usually provides a direct link. Check the full error message below:`);
+      console.error(error.message);
       console.error(`--------------------------------------------------------------------------------`);
     }
     return [];
@@ -144,9 +201,10 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
     if (topicDocSnap.exists()) {
       const data = topicDocSnap.data() as DocumentData;
       if (data.userId !== userId) {
-        console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${topicId} owned by ${data.userId}.`);
+        console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${topicId} owned by ${data.userId}. Returning null.`);
         return null; 
       }
+      console.log(`[getTopicByIdAction] Found topic "${data.name}" for ID ${topicId}.`);
       return {
         id: topicDocSnap.id,
         name: data.name,
@@ -160,10 +218,8 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
     }
   } catch (error) {
     console.error(`[getTopicByIdAction] Error fetching topic by ID ${topicId} for user ${userId}:`, error);
-    // No specific index error check here as it's a direct doc get, permissions are more likely.
+    // This is a direct document get, so index errors are not expected here.
+    // Permissions or network issues are more likely.
     return null;
   }
 }
-
-
-    
