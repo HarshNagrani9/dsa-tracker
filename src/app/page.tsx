@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User } from "lucide-react";
+import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User, LineChart } from "lucide-react";
 import { getQuestionAggregatesAction } from "@/lib/actions/questionActions";
 import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 import { getStreakDataAction } from "@/lib/actions/streakActions";
@@ -25,40 +25,48 @@ interface DashboardData {
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [dashboardData, setDashboardData] = React.useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
   React.useEffect(() => {
-    async function fetchData() {
-      if (user?.uid) {
-        setIsLoading(true);
-        try {
-          const [aggregates, upcomingContests, streak] = await Promise.all([
-            getQuestionAggregatesAction(user.uid),
-            getUpcomingContestsCountAction(user.uid),
-            getStreakDataAction(user.uid),
-          ]);
-          setDashboardData({
-            totalSolved: aggregates.totalSolved,
-            difficultyData: aggregates.difficultyData,
-            platformData: aggregates.platformData,
-            upcomingContests,
-            streakData: streak,
-          });
-        } catch (error) {
-          console.error("Error fetching dashboard data:", error);
-          // Optionally set error state to display an error message
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (!authLoading) { // User is not logged in, and auth is not loading
-        setDashboardData(null); // Clear data or set to a default logged-out state
+    async function fetchUserDashboardData(currentUserId: string) {
+      setIsLoading(true);
+      setDashboardData(null); // Clear previous data
+      try {
+        const [aggregates, upcomingContests, streak] = await Promise.all([
+          getQuestionAggregatesAction(currentUserId),
+          getUpcomingContestsCountAction(currentUserId),
+          getStreakDataAction(currentUserId),
+        ]);
+        setDashboardData({
+          totalSolved: aggregates.totalSolved,
+          difficultyData: aggregates.difficultyData,
+          platformData: aggregates.platformData,
+          upcomingContests,
+          streakData: streak,
+        });
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        setDashboardData(null); 
+      } finally {
         setIsLoading(false);
       }
     }
-    fetchData();
+
+    if (authLoading) {
+      setIsLoading(true);
+      setDashboardData(null);
+      return;
+    }
+
+    if (user?.uid) {
+      fetchUserDashboardData(user.uid);
+    } else {
+      setDashboardData(null);
+      setIsLoading(false);
+    }
   }, [user, authLoading]);
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-10 w-1/3" />
@@ -73,27 +81,43 @@ export default function DashboardPage() {
     );
   }
 
-  if (!user) {
+  if (!user) { // Auth loaded, no user
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
         <h1 className="text-3xl font-bold tracking-tight font-headline mb-2">Welcome to DSA Tracker</h1>
         <p className="text-xl text-muted-foreground mb-6">Please sign in to track your progress and view your dashboard.</p>
-        {/* The sign-in button is in the sidebar, but could be duplicated here if desired */}
       </div>
     );
   }
 
-  if (!dashboardData) {
+  if (isLoading) { // User is logged in, but data is still loading
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-10 w-1/3" />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-80 rounded-lg" />
+          <Skeleton className="h-80 rounded-lg" />
+        </div>
+      </div>
+    );
+  }
+  
+  if (!dashboardData) { // User is logged in, data loaded, but something went wrong or no data
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <h1 className="text-2xl font-bold">Loading Dashboard...</h1>
-        <p className="text-muted-foreground">If this takes too long, please try refreshing.</p>
+        <LineChart className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-2xl font-bold">No Dashboard Data</h1>
+        <p className="text-muted-foreground">Could not load dashboard data or no activity recorded yet.</p>
+        <p className="text-muted-foreground mt-1">Try adding some questions or contests!</p>
       </div>
     );
   }
 
-
+  // User is logged in and dashboard data is available
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight font-headline">Dashboard</h1>

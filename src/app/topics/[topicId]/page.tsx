@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink, ListFilter, User } from 'lucide-react';
+import { ArrowLeft, ExternalLink, ListFilter, User, AlertTriangle, ListX } from 'lucide-react';
 import { format } from 'date-fns';
 import type { QuestionDocument, TopicDocument } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
@@ -27,42 +27,53 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
   
   const [topic, setTopic] = React.useState<TopicDocument | null>(null);
   const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    async function fetchTopicData() {
-      if (user?.uid && topicId) {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const fetchedTopic = await getTopicByIdAction(topicId, user.uid);
-          if (fetchedTopic) {
-            setTopic(fetchedTopic);
-            const fetchedQuestions = await getQuestionsByTopicNameAction(fetchedTopic.name, user.uid);
-            setQuestions(fetchedQuestions);
-          } else {
-            setError("Topic not found or you're not authorized to view it.");
-            setTopic(null);
-            setQuestions([]);
-          }
-        } catch (e) {
-          console.error("Error fetching topic details:", e);
-          setError("Failed to load topic details.");
-        } finally {
-          setIsLoading(false);
+    async function fetchTopicPageData(currentTopicId: string, currentUserId: string) {
+      setIsLoading(true);
+      setError(null);
+      setTopic(null); // Clear previous data
+      setQuestions([]); // Clear previous data
+      try {
+        const fetchedTopic = await getTopicByIdAction(currentTopicId, currentUserId);
+        if (fetchedTopic) {
+          setTopic(fetchedTopic);
+          const fetchedQuestions = await getQuestionsByTopicNameAction(fetchedTopic.name, currentUserId);
+          setQuestions(fetchedQuestions);
+        } else {
+          setError("Topic not found or you're not authorized to view it.");
+          setTopic(null);
+          setQuestions([]);
         }
-      } else if (!authLoading) { // User not logged in or no topicId
+      } catch (e) {
+        console.error("Error fetching topic details:", e);
+        setError("Failed to load topic details. Please try again.");
+      } finally {
         setIsLoading(false);
-        setTopic(null);
-        setQuestions([]);
-        if (!user) setError("Please sign in to view topic details.");
       }
     }
-    fetchTopicData();
+
+    if (authLoading) {
+      setIsLoading(true);
+      setTopic(null);
+      setQuestions([]);
+      setError(null);
+      return;
+    }
+
+    if (user?.uid && topicId) {
+      fetchTopicPageData(topicId, user.uid);
+    } else {
+      setIsLoading(false);
+      setTopic(null);
+      setQuestions([]);
+      if (!user) setError(null); // Don't show error if just not signed in, handled by UI
+    }
   }, [topicId, user, authLoading]);
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
@@ -82,7 +93,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  if (!user && !authLoading) {
+  if (!user) { // Auth loaded, no user
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -95,10 +106,33 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
   
-  if (error) {
+  // User is logged in, handle data loading, error, and display
+  if (isLoading) { // Data is loading for the logged-in user
+     return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-10 w-1/2" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) { // Error occurred fetching data for logged-in user
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <h1 className="text-2xl font-bold text-destructive">{error}</h1>
+        <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
+        <h1 className="text-2xl font-bold text-destructive mb-2">Error Loading Topic</h1>
+        <p className="text-muted-foreground">{error}</p>
         <Button asChild className="mt-4">
           <Link href="/topics">Back to Topics</Link>
         </Button>
@@ -106,9 +140,10 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  if (!topic) {
+  if (!topic) { // Data loaded, no error, but topic still not found (should be caught by error usually)
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <FolderX className="h-16 w-16 text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold">Topic Not Found</h1>
         <p className="text-muted-foreground">The topic you are looking for does not exist or you might not have access.</p>
         <Button asChild className="mt-4">
@@ -118,6 +153,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
+  // User logged in, topic loaded, display questions
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -189,9 +225,9 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
                 ))}
               </TableBody>
             </Table>
-          ) : (
+          ) : ( // User logged in, topic loaded, but no questions for this topic for this user
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-              <ListFilter className="h-12 w-12 text-muted-foreground mb-3" />
+              <ListX className="h-12 w-12 text-muted-foreground mb-3" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet for {topic.name}</h3>
               <p className="text-sm text-muted-foreground">Add questions to this topic to see them here.</p>
             </div>

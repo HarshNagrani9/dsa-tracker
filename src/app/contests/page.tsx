@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Trophy, User } from "lucide-react";
+import { Trophy, User, ListX } from "lucide-react";
 import { getContestsAction } from '@/lib/actions/contestActions';
 import type { ContestDocumentClient } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,30 +16,38 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ContestsPage() {
   const { user, loading: authLoading } = useAuth();
   const [contests, setContests] = React.useState<ContestDocumentClient[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
   React.useEffect(() => {
-    async function fetchContests() {
-      if (user?.uid) {
-        setIsLoading(true);
-        try {
-          const userContests = await getContestsAction(user.uid);
-          setContests(userContests);
-        } catch (error) {
-          console.error("Error fetching contests:", error);
-          setContests([]);
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (!authLoading) {
+    async function fetchUserContests(currentUserId: string) {
+      setIsLoading(true);
+      setContests([]); // Clear previous data
+      try {
+        const userContests = await getContestsAction(currentUserId);
+        setContests(userContests);
+      } catch (error) {
+        console.error("Error fetching contests:", error);
         setContests([]);
+      } finally {
         setIsLoading(false);
       }
     }
-    fetchContests();
+
+    if (authLoading) {
+      setIsLoading(true);
+      setContests([]);
+      return;
+    }
+
+    if (user?.uid) {
+      fetchUserContests(user.uid);
+    } else {
+      setContests([]);
+      setIsLoading(false);
+    }
   }, [user, authLoading]);
 
-  if (authLoading || (isLoading && !contests.length && !user)) {
+  if (authLoading) {
      return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
@@ -59,7 +67,7 @@ export default function ContestsPage() {
     );
   }
 
-  if (!user && !authLoading) {
+  if (!user) { // Auth loaded, no user
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -69,11 +77,12 @@ export default function ContestsPage() {
     );
   }
 
+  // User is logged in
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight font-headline">Contests</h1>
-        {user && <AddContestDialog />}
+        <AddContestDialog />
       </div>
       
       <Card>
@@ -84,7 +93,7 @@ export default function ContestsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-           {isLoading && contests.length === 0 ? (
+           {isLoading ? ( // Data loading for logged-in user
              <Skeleton className="h-64 w-full" />
           ) : contests.length > 0 ? (
             <Table>
@@ -132,11 +141,11 @@ export default function ContestsPage() {
                 })}
               </TableBody>
             </Table>
-          ) : (
+          ) : ( // User logged in, data loaded, but no contests
              <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center h-60">
-              <Trophy className="h-16 w-16 text-muted-foreground mb-4" />
+              <ListX className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Contests Tracked</h3>
-              <p className="text-sm text-muted-foreground">Add your first contest to start tracking.</p>
+              <p className="text-sm text-muted-foreground">You haven&apos;t added any contests yet. Add your first contest to start tracking.</p>
             </div>
           )}
         </CardContent>

@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Flame, Star, CalendarDays, User } from "lucide-react";
+import { Flame, Star, CalendarDays, User, Activity } from "lucide-react";
 import Image from 'next/image';
 import { getStreakDataAction } from '@/lib/actions/streakActions';
 import type { StreakData } from '@/lib/types';
@@ -14,30 +14,38 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function StreakPage() {
   const { user, loading: authLoading } = useAuth();
   const [streakData, setStreakData] = React.useState<StreakData | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
   React.useEffect(() => {
-    async function fetchStreakData() {
-      if (user?.uid) {
-        setIsLoading(true);
-        try {
-          const data = await getStreakDataAction(user.uid);
-          setStreakData(data);
-        } catch (error) {
-          console.error("Error fetching streak data:", error);
-          setStreakData({ currentStreak: 0, maxStreak: 0, lastActivityDate: '' });
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (!authLoading) {
-        setStreakData(null);
+    async function fetchUserStreakData(currentUserId: string) {
+      setIsLoading(true);
+      setStreakData(null); // Clear previous data
+      try {
+        const data = await getStreakDataAction(currentUserId);
+        setStreakData(data);
+      } catch (error) {
+        console.error("Error fetching streak data:", error);
+        setStreakData({ currentStreak: 0, maxStreak: 0, lastActivityDate: '' });
+      } finally {
         setIsLoading(false);
       }
     }
-    fetchStreakData();
+
+    if (authLoading) {
+      setIsLoading(true);
+      setStreakData(null);
+      return;
+    }
+
+    if (user?.uid) {
+      fetchUserStreakData(user.uid);
+    } else {
+      setStreakData(null);
+      setIsLoading(false);
+    }
   }, [user, authLoading]);
 
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
       <div className="flex flex-col gap-8">
         <div className="text-center">
@@ -54,7 +62,7 @@ export default function StreakPage() {
     );
   }
 
-  if (!user && !authLoading) {
+  if (!user) { // Auth loaded, no user
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -64,15 +72,34 @@ export default function StreakPage() {
     );
   }
   
-  if (!streakData) {
-    // This case might occur briefly or if there's an issue fetching data for a logged-in user
+  if (isLoading) { // User logged in, data loading
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <h1 className="text-2xl font-bold">Loading Streak Data...</h1>
+      <div className="flex flex-col gap-8">
+        <div className="text-center">
+          <Skeleton className="h-10 w-1/2 mx-auto mb-2" />
+          <Skeleton className="h-6 w-3/4 mx-auto" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-56 rounded-lg" />
+          <Skeleton className="h-56 rounded-lg" />
+        </div>
+        <Skeleton className="h-40 rounded-lg" />
+        <Skeleton className="h-60 rounded-lg" />
       </div>
     );
   }
 
+  if (!streakData) { // User logged in, data loaded, but something went wrong
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <Activity className="h-16 w-16 text-muted-foreground mb-4" />
+        <h1 className="text-2xl font-bold">Could Not Load Streak Data</h1>
+        <p className="text-muted-foreground">There was an issue fetching your streak information. Please try again later.</p>
+      </div>
+    );
+  }
+
+  // User logged in, streak data available
   return (
     <div className="flex flex-col gap-8">
       <div className="text-center">
@@ -105,6 +132,11 @@ export default function StreakPage() {
                 Last activity: {format(parseISO(streakData.lastActivityDate), 'MMMM d, yyyy')}
               </p>
             )}
+             {streakData.currentStreak === 0 && (
+              <p className="text-sm text-muted-foreground mt-3">
+                Solve a problem today to start your streak!
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -124,7 +156,7 @@ export default function StreakPage() {
             </p>
              {streakData.maxStreak === 0 && streakData.currentStreak === 0 && (
               <p className="text-sm text-muted-foreground mt-3">
-                Solve a problem to set your first record!
+                No record yet. Keep solving!
               </p>
             )}
           </CardContent>

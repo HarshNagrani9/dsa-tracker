@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ListChecks, FileQuestion, User } from "lucide-react";
+import { ListChecks, FileQuestion, User, FolderX } from "lucide-react";
 import { getTopicsAction } from '@/lib/actions/topicActions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AddTopicDialog } from '@/components/topics/AddTopicDialog';
@@ -16,30 +16,38 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function TopicsPage() {
   const { user, loading: authLoading } = useAuth();
   const [topics, setTopics] = React.useState<TopicDocument[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
   React.useEffect(() => {
-    async function fetchTopics() {
-      if (user?.uid) {
-        setIsLoading(true);
-        try {
-          const userTopics = await getTopicsAction(user.uid);
-          setTopics(userTopics);
-        } catch (error) {
-          console.error("Error fetching topics:", error);
-          setTopics([]);
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (!authLoading) {
-        setTopics([]); // Clear topics if user logs out or auth is not loading
+    async function fetchUserTopics(currentUserId: string) {
+      setIsLoading(true);
+      setTopics([]); // Clear previous data
+      try {
+        const userTopics = await getTopicsAction(currentUserId);
+        setTopics(userTopics);
+      } catch (error) {
+        console.error("Error fetching topics:", error);
+        setTopics([]);
+      } finally {
         setIsLoading(false);
       }
     }
-    fetchTopics();
+
+    if (authLoading) {
+      setIsLoading(true);
+      setTopics([]);
+      return;
+    }
+
+    if (user?.uid) {
+      fetchUserTopics(user.uid);
+    } else {
+      setTopics([]);
+      setIsLoading(false);
+    }
   }, [user, authLoading]);
 
-  if (authLoading || (isLoading && !topics.length)) {
+  if (authLoading) {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
@@ -63,7 +71,7 @@ export default function TopicsPage() {
     );
   }
   
-  if (!user && !authLoading) {
+  if (!user) { // Auth loaded, no user
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -73,11 +81,12 @@ export default function TopicsPage() {
     );
   }
 
+  // User is logged in
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight font-headline">Topics</h1>
-        {user && <AddTopicDialog />}
+        <AddTopicDialog /> {/* AddTopicDialog visibility is handled internally based on user */}
       </div>
       
       <Card>
@@ -88,10 +97,12 @@ export default function TopicsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading && topics.length === 0 ? (
-             <div className="space-y-3">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
-              </div>
+          {isLoading ? ( // Data loading for logged-in user
+             <ScrollArea className="h-[calc(100vh-22rem)]">
+              <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
+                </div>
+            </ScrollArea>
           ) : topics.length > 0 ? (
             <ScrollArea className="h-[calc(100vh-22rem)]"> 
               <ul className="space-y-3">
@@ -107,7 +118,7 @@ export default function TopicsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                          <Badge variant="secondary" className="font-normal">
-                          {topic.questionCount || 0} Question{topic.questionCount === 1 ? '' : 's'}
+                          {topic.questionCount || 0} Question{topic.questionCount === 1 || topic.questionCount === 0 ? '' : 's'}
                          </Badge>
                         <FileQuestion className="h-4 w-4 text-muted-foreground group-hover:text-accent" />
                       </div>
@@ -116,11 +127,11 @@ export default function TopicsPage() {
                 ))}
               </ul>
             </ScrollArea>
-          ) : (
+          ) : ( // User logged in, data loaded, but no topics found
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center h-60">
-              <ListChecks className="h-16 w-16 text-muted-foreground mb-4" />
+              <FolderX className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Topics Yet</h3>
-              <p className="text-sm text-muted-foreground">Add your first topic to start organizing questions.</p>
+              <p className="text-sm text-muted-foreground">Add your first topic to start organizing your questions.</p>
             </div>
           )}
         </CardContent>
