@@ -1,10 +1,13 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, LineChart, PieChartIcon } from "lucide-react";
+import { BarChart as BarChartIcon, LineChart as LineChartIcon, PieChartIcon as PieChartIconLucide, Activity, CalendarClock } from "lucide-react";
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import type { QuestionDocument, Difficulty, Platform } from "@/lib/types";
 import { DIFFICULTIES, PLATFORMS } from "@/lib/constants";
+import { DifficultyChart } from "@/components/dashboard/DifficultyChart";
+import { PlatformChart } from "@/components/dashboard/PlatformChart";
+import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 
 async function getTotalQuestionsSolved(): Promise<number> {
   try {
@@ -17,28 +20,14 @@ async function getTotalQuestionsSolved(): Promise<number> {
   }
 }
 
-async function getUpcomingContestsCount(): Promise<number> {
-  // TODO: Implement actual fetching from a 'contests' collection
-  // This would involve querying contests where date is in the future.
-  // For now, returning a placeholder.
-  // Example:
-  // try {
-  //   const contestsCollection = collection(db, "contests");
-  //   const today = new Date();
-  //   const q = query(contestsCollection, where("date", ">=", Timestamp.fromDate(today)));
-  //   const querySnapshot = await getDocs(q);
-  //   return querySnapshot.size;
-  // } catch (error) {
-  //   console.error("Error fetching upcoming contests:", error);
-  //   return 0;
-  // }
-  return 0; // Placeholder
-}
+// Using the new action
+// async function getUpcomingContestsCount(): Promise<number> {
+//   return getUpcomingContestsCountAction();
+// }
 
 async function getCurrentStreak(): Promise<number> {
-  // TODO: Implement actual streak calculation.
-  // This would likely involve checking a log of daily solved questions or activities.
-  // For now, returning a placeholder.
+  // TODO: Implement actual streak calculation from an 'activityLog' collection.
+  // This would involve checking consecutive days with logged activity.
   return 0; // Placeholder
 }
 
@@ -53,7 +42,6 @@ async function getQuestionAggregates(): Promise<{
     questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
   } catch (error) {
     console.error("Error fetching questions for aggregation:", error);
-    // Return default empty state if fetch fails
   }
 
   const difficultyCounts: Record<Difficulty, number> = { Easy: 0, Medium: 0, Hard: 0 };
@@ -67,21 +55,21 @@ async function getQuestionAggregates(): Promise<{
     }
     if (q.platform && platformCounts[q.platform] !== undefined) {
       platformCounts[q.platform]++;
-    } else if (q.platform) {
-      platformCounts.Other++; // Catch-all for platforms not in the predefined list
+    } else if (q.platform) { // Handles platforms not in predefined list if data source changes
+      platformCounts.Other = (platformCounts.Other || 0) + 1;
     }
   });
 
   const finalDifficultyData = DIFFICULTIES.map((diff, index) => ({
     name: diff,
     count: difficultyCounts[diff],
-    fill: `hsl(var(--chart-${index + 1}))`, // Cycle through chart-1, chart-2, chart-3
+    fill: `hsl(var(--chart-${index + 1}))`,
   }));
   
   const finalPlatformData = PLATFORMS.map((plat, index) => ({
     name: plat,
-    count: platformCounts[plat],
-    fill: `hsl(var(--chart-${(index % 5) + 1}))`, // Cycle through chart-1 to chart-5
+    count: platformCounts[plat] || 0, // ensure count is 0 if no questions for that platform
+    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
   }));
 
   return { difficultyData: finalDifficultyData, platformData: finalPlatformData };
@@ -90,7 +78,7 @@ async function getQuestionAggregates(): Promise<{
 
 export default async function DashboardPage() {
   const totalSolved = await getTotalQuestionsSolved();
-  const upcomingContests = await getUpcomingContestsCount();
+  const upcomingContests = await getUpcomingContestsCountAction(); // Using action
   const currentStreak = await getCurrentStreak();
   const { difficultyData, platformData } = await getQuestionAggregates();
 
@@ -102,31 +90,31 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Questions Solved</CardTitle>
-            <BarChart className="h-4 w-4 text-muted-foreground" />
+            <BarChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalSolved}</div>
-            {/* <p className="text-xs text-muted-foreground">+5 from last week</p> */}
+            <p className="text-xs text-muted-foreground">Across all topics and platforms.</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
-            <LineChart className="h-4 w-4 text-muted-foreground" />
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{currentStreak} Days</div>
-            <p className="text-xs text-muted-foreground">{currentStreak > 0 ? "Keep it up!" : "Start today!"}</p>
+            <p className="text-xs text-muted-foreground">{currentStreak > 0 ? "Keep the fire burning!" : "Start your streak today!"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Upcoming Contests</CardTitle>
-            <PieChartIcon className="h-4 w-4 text-muted-foreground" />
+            <CalendarClock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{upcomingContests}</div>
-            {/* <p className="text-xs text-muted-foreground">Next one in 2 days</p> */}
+             <p className="text-xs text-muted-foreground">{upcomingContests > 0 ? "Check the contests page." : "No upcoming contests tracked."}</p>
           </CardContent>
         </Card>
       </div>
@@ -137,27 +125,8 @@ export default async function DashboardPage() {
             <CardTitle>Questions by Difficulty</CardTitle>
             <CardDescription>Distribution of solved questions based on difficulty.</CardDescription>
           </CardHeader>
-          <CardContent>
-            {difficultyData.reduce((sum, item) => sum + item.count, 0) > 0 ? (
-              <>
-                {/* Placeholder for Chart component - Actual chart implementation needed */}
-                <div className="h-[300px] w-full bg-muted/50 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">Difficulty Chart Placeholder</p>
-                </div>
-                <div className="mt-4 flex justify-around text-sm">
-                  {difficultyData.map(item => item.count > 0 && (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.fill }}></span>
-                      {item.name}: {item.count}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-[300px] w-full bg-muted/50 rounded-md flex items-center justify-center">
-                <p className="text-muted-foreground">No difficulty data available.</p>
-              </div>
-            )}
+          <CardContent className="pl-2">
+            <DifficultyChart data={difficultyData} />
           </CardContent>
         </Card>
         <Card>
@@ -166,30 +135,10 @@ export default async function DashboardPage() {
             <CardDescription>Distribution of solved questions across different platforms.</CardDescription>
           </CardHeader>
           <CardContent>
-             {platformData.reduce((sum, item) => sum + item.count, 0) > 0 ? (
-              <>
-                {/* Placeholder for Chart component - Actual chart implementation needed */}
-                <div className="h-[300px] w-full bg-muted/50 rounded-md flex items-center justify-center">
-                  <p className="text-muted-foreground">Platform Chart Placeholder</p>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  {platformData.map(item => item.count > 0 && (
-                    <div key={item.name} className="flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.fill }}></span>
-                      {item.name}: {item.count}
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="h-[300px] w-full bg-muted/50 rounded-md flex items-center justify-center">
-                <p className="text-muted-foreground">No platform data available.</p>
-              </div>
-            )}
+             <PlatformChart data={platformData} />
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-
