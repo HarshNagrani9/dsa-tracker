@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
+import { DialogClose } from '@/components/ui/dialog';
 
 interface AddQuestionFormProps {
   onFormSubmitSuccess: () => void;
@@ -237,7 +238,12 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
           name="userId"
           render={({ field }) => <input type="hidden" {...field} />}
         />
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2 pt-2">
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancel
+            </Button>
+          </DialogClose>
           <Button type="submit" disabled={isSubmitting || authLoading || !user}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Adding...' : 'Add Question'}

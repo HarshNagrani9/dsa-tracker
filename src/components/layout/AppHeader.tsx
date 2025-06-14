@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { AddQuestionForm } from "@/components/questions/AddQuestionForm";
 import { useAuth } from "@/providers/AuthProvider";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export function AppHeader() {
   const [isAddQuestionDialogOpen, setIsAddQuestionDialogOpen] = React.useState(false);
@@ -53,9 +54,13 @@ export function AppHeader() {
                   Fill in the details for the new DSA question you want to track.
                 </DialogDescription>
               </DialogHeader>
-              <AddQuestionForm 
-                onFormSubmitSuccess={() => setIsAddQuestionDialogOpen(false)} 
-              />
+              <ScrollArea className="max-h-[60vh] sm:max-h-[65vh] w-full">
+                <div className="pr-4 py-1"> {/* Add padding for scrollbar and a little vertical padding */}
+                  <AddQuestionForm 
+                    onFormSubmitSuccess={() => setIsAddQuestionDialogOpen(false)} 
+                  />
+                </div>
+              </ScrollArea>
             </DialogContent>
           </Dialog>
         )}
