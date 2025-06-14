@@ -55,8 +55,9 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
 export async function getContestsAction(): Promise<ContestDocumentClient[]> {
   try {
     const contestsCollection = collection(db, 'contests');
-    // Order by date descending, then by start time ascending for contests on the same day
-    const q = query(contestsCollection, orderBy('date', 'desc'), orderBy('startTime', 'asc'));
+    // Simplified query to order only by date.
+    // For sorting by date then startTime, a composite index (date DESC, startTime ASC) is needed in Firestore.
+    const q = query(contestsCollection, orderBy('date', 'desc'));
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map(doc => {
@@ -93,3 +94,4 @@ export async function getUpcomingContestsCountAction(): Promise<number> {
     return 0;
   }
 }
+

@@ -18,7 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default async function TopicsPage() {
   const topics = await getTopicsAction();
-  const [isAddTopicDialogOpen, setIsAddTopicDialogOpen] = React.useState(false); // Server component can't use useState
+  // Removed incorrect useState from Server Component
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,3 +87,4 @@ function AddTopicDialog() {
     </Dialog>
   );
 }
+
