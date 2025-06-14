@@ -36,16 +36,17 @@ export const AddTopicSchema = z.object({
   userId: z.string({ required_error: "User ID is required."})
 });
 export type AddTopicFormInput = z.infer<typeof AddTopicSchema>;
-export interface TopicDocument extends Omit<AddTopicFormInput, 'userId'> { // userId is part of the doc, not directly in this type if always fetched for a user
+export interface TopicDocument extends Omit<AddTopicFormInput, 'userId'> {
   id: string;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
-  questionCount?: number;
+  questionCount?: number; // Made optional as it's being removed from active use
 }
 
 export type Difficulty = "Easy" | "Medium" | "Hard";
 export type Platform = "LeetCode" | "CSES" | "CodeChef" | "Codeforces" | "Other";
+export type FilterOption<T> = "All" | T;
 
 
 // Question Types
@@ -142,3 +143,4 @@ export interface StreakData {
   maxStreak: number;
   lastActivityDate: string; // YYYY-MM-DD
 }
+

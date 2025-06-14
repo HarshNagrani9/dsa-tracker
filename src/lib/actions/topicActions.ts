@@ -114,70 +114,39 @@ export async function getTopicsAction(userId: string | null | undefined): Promis
   console.log(`[getTopicsAction] Fetching topics for userId: ${userId}`);
   try {
     const topicsCollectionRef = collection(db, 'topics');
-    // TEMPORARILY REMOVED orderBy('name', 'asc') for diagnostics
+    // TEMPORARILY REMOVED orderBy('name', 'asc') for diagnostics, re-add if index exists
     const topicsQuery = query(
       topicsCollectionRef, 
       where('userId', '==', userId)
       // orderBy('name', 'asc') // Requires index: userId ASC, name ASC
     );
-    console.log(`[getTopicsAction] TEMPORARILY SIMPLIFIED QUERY. Original would be: query(topicsCollectionRef, where('userId', '==', userId), orderBy('name', 'asc'))`);
-    console.log(`[getTopicsAction] If data loads now but is unsorted, you NEED an INDEX on 'topics': userId (Ascending), name (Ascending)`);
+    // console.log(`[getTopicsAction] TEMPORARILY SIMPLIFIED QUERY. Original would be: query(topicsCollectionRef, where('userId', '==', userId), orderBy('name', 'asc'))`);
+    // console.log(`[getTopicsAction] If data loads now but is unsorted, you NEED an INDEX on 'topics': userId (Ascending), name (Ascending)`);
     
     console.log(`[getTopicsAction] Constructed Firestore query for topics (user "${userId}"):`, JSON.stringify({
       collection: 'topics',
       filters: [{ field: 'userId', op: '==', value: userId }],
-      // orderBy: [{ field: 'name', direction: 'asc' }] // Temporarily removed
+      // orderBy: [{ field: 'name', direction: 'asc' }] // Temporarily removed or re-add if index exists
     }, null, 2));
 
     const topicsSnapshot = await getDocs(topicsQuery);
     console.log(`[getTopicsAction] Firestore query for topics executed. Found ${topicsSnapshot.size} topics for userId: ${userId}`);
 
-    const topicsData: TopicDocument[] = [];
-
-    for (const topicDoc of topicsSnapshot.docs) {
+    const topicsData: TopicDocument[] = topicsSnapshot.docs.map(topicDoc => {
       const topic = topicDoc.data() as DocumentData;
-      const topicName = topic.name;
-      let questionCount = 0;
-      // TEMPORARILY REMOVING QUESTION COUNT FOR DIAGNOSTICS
-      // try {
-      //   const questionsQuery = query(
-      //     collection(db, "questions"), 
-      //     where("topicName", "==", topicName),
-      //     where("userId", "==", userId) // Requires index on questions: topicName ASC, userId ASC (or vice-versa)
-      //   );
-      //   const questionsSnapshot = await getDocs(questionsQuery);
-      //   questionCount = questionsSnapshot.size;
-      // } catch (qcError) {
-      //   console.error(`[getTopicsAction] Error fetching question count for topic "${topicName}", user "${userId}":`, qcError);
-      //   if (qcError instanceof Error && (qcError.message.includes("query requires an index") || qcError.message.includes("needs an index"))) {
-      //     console.error(`--------------------------------------------------------------------------------`);
-      //     console.error(`!!! FIRESTORE INDEX REQUIRED for 'questions' collection for Topic Question Counts !!!`);
-      //     console.error(`Query involved: where("topicName", "==", "${topicName}"), where("userId", "==", "${userId}")`);
-      //     console.error(`SUGGESTED INDEX: Go to your Firestore console and create an index on the 'questions' collection with fields:`);
-      //     console.error(`  - topicName (Ascending)`);
-      //     console.error(`  - userId (Ascending)`);
-      //     console.error(`OR:`);
-      //     console.error(`  - userId (Ascending)`);
-      //     console.error(`  - topicName (Ascending)`);
-      //     console.error(`The error message usually provides a direct link. Check the full error message below:`);
-      //     console.error(qcError.message);
-      //     console.error(`--------------------------------------------------------------------------------`);
-      //   }
-      // }
-      console.log(`[getTopicsAction] TEMPORARILY SKIPPING question count for topic "${topicName}". If topics load but counts are missing, it indicates an issue/missing index for the question count query.`);
-
-      topicsData.push({
+      return {
         id: topicDoc.id,
-        name: topicName,
+        name: topic.name,
         userId: topic.userId,
         createdAt: parseTimestampToDate(topic.createdAt),
         updatedAt: parseTimestampToDate(topic.updatedAt),
-        questionCount: questionCount, // Will be 0 due to skipped logic
-      });
-    }
+        // questionCount is no longer fetched here
+      };
+    });
+
     console.log(`[getTopicsAction] Successfully mapped ${topicsData.length} topics.`);
-    // If topics were not sorted by query, sort them here if needed for UI consistency (though this is less efficient)
-    // topicsData.sort((a, b) => a.name.localeCompare(b.name));
+    // If topics were not sorted by query (due to missing index), sort them here for UI consistency
+    topicsData.sort((a, b) => a.name.localeCompare(b.name));
     return topicsData;
   } catch (error) {
     console.error(`[getTopicsAction] Error fetching topics for user ${userId}:`, error);
@@ -202,18 +171,19 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
      console.log("[getTopicByIdAction] No userId provided, returning null.");
     return null;
   }
-  console.log(`[getTopicByIdAction] Fetching topic by ID "${topicId}" for userId: ${userId}`);
+  const resolvedTopicId = topicId; // Use the resolved param
+  console.log(`[getTopicByIdAction] Fetching topic by ID "${resolvedTopicId}" for userId: ${userId}`);
   try {
-    const topicDocRef = doc(db, 'topics', topicId);
+    const topicDocRef = doc(db, 'topics', resolvedTopicId);
     const topicDocSnap = await getDoc(topicDocRef);
 
     if (topicDocSnap.exists()) {
       const data = topicDocSnap.data() as DocumentData;
       if (data.userId !== userId) {
-        console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${topicId} owned by ${data.userId}. Returning null.`);
+        console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${resolvedTopicId} owned by ${data.userId}. Returning null.`);
         return null; 
       }
-      console.log(`[getTopicByIdAction] Found topic "${data.name}" for ID ${topicId}.`);
+      console.log(`[getTopicByIdAction] Found topic "${data.name}" for ID ${resolvedTopicId}.`);
       return {
         id: topicDocSnap.id,
         name: data.name,
@@ -222,12 +192,11 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
         updatedAt: parseTimestampToDate(data.updatedAt),
       };
     } else {
-      console.log(`[getTopicByIdAction] No such topic document with ID: ${topicId}`);
+      console.log(`[getTopicByIdAction] No such topic document with ID: ${resolvedTopicId}`);
       return null;
     }
   } catch (error) {
-    console.error(`[getTopicByIdAction] Error fetching topic by ID ${topicId} for user ${userId}:`, error);
+    console.error(`[getTopicByIdAction] Error fetching topic by ID ${resolvedTopicId} for user ${userId}:`, error);
     return null;
   }
 }
-

@@ -4,11 +4,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ListChecks, FileQuestion, User, FolderX } from "lucide-react";
+import { ListChecks, User, FolderX, ChevronRight } from "lucide-react";
 import { getTopicsAction } from '@/lib/actions/topicActions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AddTopicDialog } from '@/components/topics/AddTopicDialog';
-import { Badge } from '@/components/ui/badge';
 import type { TopicDocument } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -119,12 +118,7 @@ export default function TopicsPage() {
                         <ListChecks className="h-5 w-5 text-primary group-hover:text-accent" />
                         <span className="font-medium group-hover:text-accent">{topic.name}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                         <Badge variant="secondary" className="font-normal">
-                          {topic.questionCount || 0} Question{topic.questionCount === 1 || topic.questionCount === 0 ? '' : 's'}
-                         </Badge>
-                        <FileQuestion className="h-4 w-4 text-muted-foreground group-hover:text-accent" />
-                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-accent" />
                     </Link>
                   </li>
                 ))}
@@ -142,4 +136,3 @@ export default function TopicsPage() {
     </div>
   );
 }
-

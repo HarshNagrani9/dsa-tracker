@@ -7,13 +7,21 @@ import { getTopicByIdAction } from '@/lib/actions/topicActions';
 import { getQuestionsByTopicNameAction } from '@/lib/actions/questionActions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink, User, AlertTriangle, ListX, FolderX } from 'lucide-react';
+import { ArrowLeft, ExternalLink, User, AlertTriangle, ListX, FolderX, Filter as FilterIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import type { QuestionDocument, TopicDocument } from '@/lib/types';
+import type { QuestionDocument, TopicDocument, Difficulty, Platform, FilterOption } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
 
 interface TopicDetailPageProps {
   params: {
@@ -21,22 +29,25 @@ interface TopicDetailPageProps {
   };
 }
 
-export default function TopicDetailPage({ params }: TopicDetailPageProps) {
-  const resolvedParams = React.use(params);
-  const { topicId } = resolvedParams;
+export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageProps) {
+  const params = React.use(paramsProp); // Using React.use() for param promises
+  const { topicId } = params;
   const { user, loading: authLoading } = useAuth();
   
   const [topic, setTopic] = React.useState<TopicDocument | null>(null);
   const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true); // For data fetching
+  const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+
+  const [selectedDifficulty, setSelectedDifficulty] = React.useState<FilterOption<Difficulty>>('All');
+  const [selectedPlatform, setSelectedPlatform] = React.useState<FilterOption<Platform>>('All');
 
   React.useEffect(() => {
     async function fetchTopicPageData(currentTopicId: string, currentUserId: string) {
       setIsLoading(true);
       setError(null);
-      setTopic(null); // Clear previous data
-      setQuestions([]); // Clear previous data
+      setTopic(null);
+      setQuestions([]);
       try {
         const fetchedTopic = await getTopicByIdAction(currentTopicId, currentUserId);
         if (fetchedTopic) {
@@ -70,9 +81,17 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
       setIsLoading(false);
       setTopic(null);
       setQuestions([]);
-      if (!user) setError(null); // Don't show error if just not signed in, handled by UI
+      if (!user) setError(null);
     }
   }, [topicId, user, authLoading]);
+
+  const filteredQuestions = React.useMemo(() => {
+    return questions.filter(question => {
+      const difficultyMatch = selectedDifficulty === 'All' || question.difficulty === selectedDifficulty;
+      const platformMatch = selectedPlatform === 'All' || question.platform === selectedPlatform;
+      return difficultyMatch && platformMatch;
+    });
+  }, [questions, selectedDifficulty, selectedPlatform]);
 
   if (authLoading) {
     return (
@@ -80,6 +99,10 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10 rounded-md" />
           <Skeleton className="h-10 w-1/2" />
+        </div>
+        <div className="flex gap-4 my-4">
+          <Skeleton className="h-10 w-[180px]" />
+          <Skeleton className="h-10 w-[180px]" />
         </div>
         <Card>
           <CardHeader>
@@ -94,7 +117,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  if (!user) { // Auth loaded, no user
+  if (!user) {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <User className="h-24 w-24 text-muted-foreground mb-6" />
@@ -107,13 +130,16 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
   
-  // User is logged in, handle data loading, error, and display
-  if (isLoading) { // Data is loading for the logged-in user
+  if (isLoading) {
      return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <Skeleton className="h-10 w-10 rounded-md" />
           <Skeleton className="h-10 w-1/2" />
+        </div>
+         <div className="flex gap-4 my-4">
+          <Skeleton className="h-10 w-[180px]" />
+          <Skeleton className="h-10 w-[180px]" />
         </div>
         <Card>
           <CardHeader>
@@ -128,7 +154,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  if (error) { // Error occurred fetching data for logged-in user
+  if (error) {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <AlertTriangle className="h-16 w-16 text-destructive mb-4" />
@@ -141,7 +167,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  if (!topic) { // Data loaded, no error, but topic still not found (should be caught by error usually)
+  if (!topic) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <FolderX className="h-16 w-16 text-muted-foreground mb-4" />
@@ -154,7 +180,6 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
     );
   }
 
-  // User logged in, topic loaded, display questions
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-4">
@@ -167,15 +192,44 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
         <h1 className="text-3xl font-bold tracking-tight font-headline">{topic.name}</h1>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-4 my-0">
+        <Select onValueChange={(value) => setSelectedDifficulty(value as FilterOption<Difficulty>)} value={selectedDifficulty}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter by difficulty" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Difficulties</SelectItem>
+            {DIFFICULTIES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+          </SelectContent>
+        </Select>
+
+        <Select onValueChange={(value) => setSelectedPlatform(value as FilterOption<Platform>)} value={selectedPlatform}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter by platform" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Platforms</SelectItem>
+            {PLATFORMS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Questions in {topic.name}</CardTitle>
           <CardDescription>
-            A list of all questions tracked under the topic: {topic.name}. Total: {questions.length} question{questions.length === 1 ? '' : 's'}.
+            A list of questions tracked under this topic. Total originally fetched: {questions.length}.
+            { (selectedDifficulty !== 'All' || selectedPlatform !== 'All') && ` Currently showing: ${filteredQuestions.length}.` }
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {questions.length > 0 ? (
+          {questions.length === 0 ? (
+             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
+              <ListX className="h-12 w-12 text-muted-foreground mb-3" />
+              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet for {topic.name}</h3>
+              <p className="text-sm text-muted-foreground">Add questions to this topic to see them here.</p>
+            </div>
+          ) : filteredQuestions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -187,7 +241,7 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {questions.map((question) => (
+                {filteredQuestions.map((question) => (
                   <TableRow key={question.id}>
                     <TableCell className="font-medium">{question.title}</TableCell>
                     <TableCell>
@@ -226,11 +280,11 @@ export default function TopicDetailPage({ params }: TopicDetailPageProps) {
                 ))}
               </TableBody>
             </Table>
-          ) : ( // User logged in, topic loaded, but no questions for this topic for this user
+          ) : (
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-              <ListX className="h-12 w-12 text-muted-foreground mb-3" />
-              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet for {topic.name}</h3>
-              <p className="text-sm text-muted-foreground">Add questions to this topic to see them here.</p>
+              <FilterIcon className="h-12 w-12 text-muted-foreground mb-3" />
+              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Match Filters</h3>
+              <p className="text-sm text-muted-foreground">Try adjusting your difficulty or platform filters for the topic &quot;{topic.name}&quot;.</p>
             </div>
           )}
         </CardContent>
