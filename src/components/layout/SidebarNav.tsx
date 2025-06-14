@@ -44,7 +44,10 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
               onClick={onLinkClick} // This onClick is passed to Link by Slot
               tooltip={{content: item.title, side: "right", align: "center"}}
             >
-              <Link href={item.disabled ? "#" : item.href} legacyBehavior={false} passHref={false}>
+              {/* Link is the direct child of SidebarMenuButton (Slot) */}
+              {/* Link itself will render an <a> tag. No legacyBehavior or passHref needed here. */}
+              <Link href={item.disabled ? "#" : item.href}>
+                {/* These are children of Link, and will be inside the <a> tag Link renders */}
                 <Icon />
                 <span>{item.title}</span>
                 {item.label && (
@@ -58,4 +61,3 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
     </SidebarMenu>
   );
 }
-
