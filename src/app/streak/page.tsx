@@ -52,7 +52,7 @@ export default function StreakPage() {
           <Skeleton className="h-10 w-1/2 mx-auto mb-2" />
           <Skeleton className="h-6 w-3/4 mx-auto" />
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
           <Skeleton className="h-56 rounded-lg" />
           <Skeleton className="h-56 rounded-lg" />
         </div>
@@ -79,7 +79,7 @@ export default function StreakPage() {
           <Skeleton className="h-10 w-1/2 mx-auto mb-2" />
           <Skeleton className="h-6 w-3/4 mx-auto" />
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
           <Skeleton className="h-56 rounded-lg" />
           <Skeleton className="h-56 rounded-lg" />
         </div>
@@ -103,7 +103,7 @@ export default function StreakPage() {
   return (
     <div className="flex flex-col gap-8">
       <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight font-headline text-primary flex items-center justify-center">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight font-headline text-primary flex items-center justify-center">
           <Flame className="inline-block h-10 w-10 mr-2 " />
           Your Streaks
         </h1>
@@ -112,7 +112,7 @@ export default function StreakPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
         <Card className="shadow-xl hover:shadow-2xl transition-shadow duration-300 bg-card">
           <CardHeader className="pb-3 pt-6">
             <CardTitle className="text-2xl font-semibold flex items-center justify-center text-center gap-2">

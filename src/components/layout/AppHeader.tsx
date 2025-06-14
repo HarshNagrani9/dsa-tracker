@@ -5,7 +5,7 @@ import * as React from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,9 +33,15 @@ export function AppHeader() {
         {user && (
           <Dialog open={isAddQuestionDialogOpen} onOpenChange={setIsAddQuestionDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="hidden sm:flex">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Question
-              </Button>
+              <>
+                <Button size="sm" className="hidden sm:flex">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+                </Button>
+                <Button size="icon" variant="ghost" className="sm:hidden">
+                  <Plus className="h-5 w-5" />
+                  <span className="sr-only">Add Question</span>
+                </Button>
+              </>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[625px]">
               <DialogHeader>

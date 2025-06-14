@@ -70,10 +70,10 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-10 w-1/3" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
           <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-80 rounded-lg" />
         </div>
@@ -95,10 +95,10 @@ export default function DashboardPage() {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-10 w-1/3" />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
         </div>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
           <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-80 rounded-lg" />
         </div>
@@ -122,7 +122,7 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight font-headline">Dashboard</h1>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Questions Solved</CardTitle>
@@ -170,7 +170,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Questions by Difficulty</CardTitle>
