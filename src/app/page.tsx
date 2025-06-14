@@ -2,8 +2,10 @@
 "use client";
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User, LineChart } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User, LineChart, Loader2 } from "lucide-react";
 import { getQuestionAggregatesAction } from "@/lib/actions/questionActions";
 import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 import { getStreakDataAction } from "@/lib/actions/streakActions";
@@ -13,6 +15,8 @@ import { PlatformChart } from "@/components/dashboard/PlatformChart";
 import { useAuth } from "@/providers/AuthProvider";
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 interface DashboardData {
   totalSolved: number;
@@ -24,6 +28,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [dashboardData, setDashboardData] = React.useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
@@ -82,13 +87,31 @@ export default function DashboardPage() {
   }
 
   if (!user) { // Auth loaded, no user
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
-        <h1 className="text-3xl font-bold tracking-tight font-headline mb-2">Welcome to DSA Tracker</h1>
-        <p className="text-xl text-muted-foreground mb-6">Please sign in to track your progress and view your dashboard.</p>
-      </div>
-    );
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center py-10">
+          <User className="h-24 w-24 text-muted-foreground mb-6" />
+          <h1 className="text-3xl font-bold tracking-tight font-headline mb-2">Welcome to DSA Tracker</h1>
+          <p className="text-xl text-muted-foreground mb-6">Please sign in to track your progress and view your dashboard.</p>
+          <Button asChild className="mt-4">
+             <Link href="/signin">Sign In / Sign Up</Link>
+           </Button>
+        </div>
+      );
+    }
   }
 
   if (isLoading) { // User is logged in, but data is still loading

@@ -16,23 +16,26 @@ import {
 } from "@/components/ui/select";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink, User, AlertTriangle, ListX, FolderX, Filter as FilterIcon } from 'lucide-react';
+import { ArrowLeft, ExternalLink, User, AlertTriangle, ListX, FolderX, Filter as FilterIcon, Loader2, ListChecks } from 'lucide-react';
 import { format } from 'date-fns';
 import type { QuestionDocument, TopicDocument, Difficulty, Platform, FilterOption } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 interface TopicDetailPageProps {
-  params: {
+  params: { // Keep this structure for the prop type
     topicId: string;
   };
 }
 
 export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageProps) {
-  const params = React.use(paramsProp); // Using React.use() for param promises
-  const { topicId } = params;
+  const params = React.use(paramsProp); // Use React.use() here
+  const { topicId } = params; // Destructure after using React.use()
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   
   const [topic, setTopic] = React.useState<TopicDocument | null>(null);
   const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
@@ -81,7 +84,7 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
       setIsLoading(false);
       setTopic(null);
       setQuestions([]);
-      if (!user) setError(null);
+      if (!user) setError(null); // Clear error if it was due to no user initially
     }
   }, [topicId, user, authLoading]);
 
@@ -118,19 +121,39 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
   }
 
   if (!user) {
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <ListChecks className="h-24 w-24 text-muted-foreground mb-6" />
         <h1 className="text-2xl font-bold mb-2">Topic Details</h1>
         <p className="text-muted-foreground">Please sign in to view this topic.</p>
-         <Button asChild className="mt-4">
-          <Link href="/topics">Back to Topics</Link>
-        </Button>
+         <div className="flex gap-4 mt-6">
+            <Button asChild>
+                <Link href="/signin">Sign In / Sign Up</Link>
+            </Button>
+            <Button asChild variant="outline">
+                <Link href="/topics">Back to Topics</Link>
+            </Button>
+         </div>
       </div>
-    );
+     );
+    }
   }
   
-  if (isLoading) {
+  if (isLoading && !error) { // Show skeleton only if loading and no preceding error
      return (
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
@@ -167,7 +190,7 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
     );
   }
 
-  if (!topic) {
+  if (!topic) { // This case might be hit if not loading, no error, but topic is still null (e.g., after fetchTopicPageData sets it to null on non-existence)
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <FolderX className="h-16 w-16 text-muted-foreground mb-4" />
@@ -223,7 +246,7 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {questions.length === 0 ? (
+          {questions.length === 0 && !isLoading ? ( // Ensure not loading before showing "No Questions Yet"
              <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
               <ListX className="h-12 w-12 text-muted-foreground mb-3" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet for {topic.name}</h3>
@@ -280,13 +303,13 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
                 ))}
               </TableBody>
             </Table>
-          ) : (
+          ) : (questions.length > 0 && filteredQuestions.length === 0 && !isLoading) ? ( // Show filter message only if there are questions but none match filter
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
               <FilterIcon className="h-12 w-12 text-muted-foreground mb-3" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Questions Match Filters</h3>
               <p className="text-sm text-muted-foreground">Try adjusting your difficulty or platform filters for the topic &quot;{topic.name}&quot;.</p>
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>

@@ -2,17 +2,22 @@
 "use client";
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Flame, Star, CalendarDays, User, Activity } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Flame, Star, CalendarDays, User, Activity, Loader2 } from "lucide-react";
 import Image from 'next/image';
 import { getStreakDataAction } from '@/lib/actions/streakActions';
 import type { StreakData } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 export default function StreakPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [streakData, setStreakData] = React.useState<StreakData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true); // For data fetching
 
@@ -62,14 +67,32 @@ export default function StreakPage() {
     );
   }
 
-  if (!user) { // Auth loaded, no user
+  if (!user) { 
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <Flame className="h-24 w-24 text-muted-foreground mb-6" /> 
         <h1 className="text-2xl font-bold mb-2">Your Streaks</h1>
         <p className="text-muted-foreground">Please sign in to view and track your streaks.</p>
+        <Button asChild className="mt-6">
+          <Link href="/signin">Sign In / Sign Up</Link>
+        </Button>
       </div>
-    );
+     );
+    }
   }
   
   if (isLoading) { // User logged in, data loading

@@ -2,8 +2,10 @@
 "use client";
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Trophy, User, ListX } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Trophy, User, ListX, Loader2 } from "lucide-react";
 import { getContestsAction } from '@/lib/actions/contestActions';
 import type { ContestDocumentClient } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,9 +14,12 @@ import { Badge } from '@/components/ui/badge';
 import { AddContestDialog } from '@/components/contests/AddContestDialog';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 export default function ContestsPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [contests, setContests] = React.useState<ContestDocumentClient[]>([]);
   const [isLoading, setIsLoading] = React.useState(true); 
 
@@ -72,13 +77,31 @@ export default function ContestsPage() {
   }
 
   if (!user) { 
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <Trophy className="h-24 w-24 text-muted-foreground mb-6" />
         <h1 className="text-2xl font-bold mb-2">Your Contests</h1>
         <p className="text-muted-foreground">Please sign in to manage and view your contests.</p>
+        <Button asChild className="mt-6">
+          <Link href="/signin">Sign In / Sign Up</Link>
+        </Button>
       </div>
-    );
+     );
+    }
   }
 
   return (
@@ -156,4 +179,3 @@ export default function ContestsPage() {
     </div>
   );
 }
-

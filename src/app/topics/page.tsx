@@ -4,16 +4,20 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ListChecks, User, FolderX, ChevronRight } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { ListChecks, User, FolderX, ChevronRight, Loader2 } from "lucide-react";
 import { getTopicsAction } from '@/lib/actions/topicActions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AddTopicDialog } from '@/components/topics/AddTopicDialog';
 import type { TopicDocument } from '@/lib/types';
 import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 export default function TopicsPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [topics, setTopics] = React.useState<TopicDocument[]>([]);
   const [isLoading, setIsLoading] = React.useState(true); 
 
@@ -75,13 +79,31 @@ export default function TopicsPage() {
   }
   
   if (!user) { 
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <ListChecks className="h-24 w-24 text-muted-foreground mb-6" />
         <h1 className="text-2xl font-bold mb-2">Topics</h1>
         <p className="text-muted-foreground">Please sign in to manage and view your topics.</p>
+        <Button asChild className="mt-6">
+          <Link href="/signin">Sign In / Sign Up</Link>
+        </Button>
       </div>
-    );
+     );
+    }
   }
 
   return (

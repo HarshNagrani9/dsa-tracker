@@ -2,7 +2,9 @@
 "use client";
 
 import * as React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -24,11 +26,14 @@ import { format } from 'date-fns';
 import { useAuth } from '@/providers/AuthProvider';
 import { getAllQuestionsAction } from '@/lib/actions/questionActions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, ListX, Filter } from 'lucide-react';
+import { User, ListX, Filter as FilterIcon, Loader2, FileQuestion } from 'lucide-react'; // Added FileQuestion for consistency
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { SignInForm } from '@/components/auth/SignInForm';
 
 export default function QuestionsPage() {
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -42,8 +47,9 @@ export default function QuestionsPage() {
       try {
         const userQuestions = await getAllQuestionsAction(currentUserId);
         setQuestions(userQuestions);
+        console.log("[QuestionsPage] useEffect: getAllQuestionsAction returned:", userQuestions);
       } catch (error) {
-        console.error("Error fetching questions:", error);
+        console.error("[QuestionsPage] Error fetching questions:", error);
         setQuestions([]);
       } finally {
         setIsLoading(false);
@@ -94,13 +100,31 @@ export default function QuestionsPage() {
   }
 
   if (!user) {
+    if (isMobile === undefined) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-10">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    if (isMobile) {
+      return (
+        <div className="flex flex-col items-center justify-center pt-8 sm:pt-12">
+          <SignInForm />
+        </div>
+      );
+    } else {
      return (
       <div className="flex flex-col items-center justify-center h-full text-center py-10">
-        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <FileQuestion className="h-24 w-24 text-muted-foreground mb-6" />
         <h1 className="text-2xl font-bold mb-2">Your Questions</h1>
         <p className="text-muted-foreground">Please sign in to manage and view your questions.</p>
+        <Button asChild className="mt-6">
+          <Link href="/signin">Sign In / Sign Up</Link>
+        </Button>
       </div>
-    );
+     );
+    }
   }
 
   return (
@@ -198,7 +222,7 @@ export default function QuestionsPage() {
             </Table>
           ) : (
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-              <Filter className="h-16 w-16 text-muted-foreground mb-4" />
+              <FilterIcon className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-xl font-semibold text-muted-foreground">No Questions Match Filters</h3>
               <p className="text-sm text-muted-foreground">Try adjusting your difficulty or platform filters.</p>
             </div>
