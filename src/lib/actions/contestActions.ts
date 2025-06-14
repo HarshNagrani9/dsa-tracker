@@ -44,14 +44,14 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
   }
 
   try {
-    const contestData: Omit<ContestDocumentFirestore, 'id'> = { // Ensure type matches Firestore structure
+    const contestData: Omit<ContestDocumentFirestore, 'id'> = { 
       title: validationResult.data.title,
       platform: validationResult.data.platform,
       date: Timestamp.fromDate(validationResult.data.date), 
       startTime: validationResult.data.startTime,
       endTime: validationResult.data.endTime,
       userId: validationResult.data.userId,
-      createdAt: serverTimestamp() as Timestamp, // Cast needed as serverTimestamp can be FieldValue
+      createdAt: serverTimestamp() as Timestamp, 
       updatedAt: serverTimestamp() as Timestamp,
     };
     await addDoc(collection(db, 'contests'), contestData);
@@ -76,7 +76,11 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
 }
 
 export async function getContestsAction(userId: string | null | undefined): Promise<ContestDocumentClient[]> {
-  if (!userId) return [];
+  if (!userId) {
+    console.log("[getContestsAction] No userId provided, returning empty array.");
+    return [];
+  }
+  console.log(`[getContestsAction] Fetching contests for userId: ${userId}`);
   try {
     const contestsCollection = collection(db, 'contests');
     const q = query(
@@ -84,10 +88,13 @@ export async function getContestsAction(userId: string | null | undefined): Prom
       where('userId', '==', userId),
       orderBy('date', 'desc')
     );
+    console.log(`[getContestsAction] Constructed Firestore query for contests (user "${userId}"):`, JSON.stringify(q, null, 2));
+
     const querySnapshot = await getDocs(q);
+    console.log(`[getContestsAction] Found ${querySnapshot.size} contests for userId: ${userId}`);
 
     return querySnapshot.docs.map(doc => {
-      const data = doc.data() as DocumentData; // Firestore data
+      const data = doc.data() as DocumentData; 
       return {
         id: doc.id,
         title: data.title,
@@ -101,7 +108,15 @@ export async function getContestsAction(userId: string | null | undefined): Prom
       } as ContestDocumentClient; 
     });
   } catch (error) {
-    console.error('Error fetching contests:', error);
+    console.error(`[getContestsAction] Error fetching contests for user ${userId}:`, error);
+    if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'contests' collection for Contest Page.`);
+      console.error(`Query involved: where('userId', '==', '${userId}'), orderBy('date', 'desc')`);
+      console.error(`Suggested index fields: userId (ASC), date (DESC) on 'contests' collection.`);
+      console.error(`The error message usually provides a direct link to create it in the Firebase console: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
     return [];
   }
 }
@@ -123,6 +138,14 @@ export async function getUpcomingContestsCountAction(userId: string | null | und
     return querySnapshot.size;
   } catch (error) {
     console.error("Error fetching upcoming contests count:", error);
+    if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'contests' collection for upcoming contests count.`);
+      console.error(`Query involved: where('userId', '==', '${userId}'), where('date', '>=', today)`);
+      console.error(`Suggested index fields: userId (ASC), date (ASC) on 'contests' collection.`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
     return 0;
   }
 }

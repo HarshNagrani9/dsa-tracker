@@ -30,6 +30,48 @@ const parseTimestampToDate = (timestampField: any): Date => {
   return new Date();
 };
 
+async function findOrCreateTopic(topicName: string, userId: string): Promise<string | null> {
+  console.log(`[findOrCreateTopic] Attempting to find or create topic: "${topicName}" for userId: ${userId}`);
+  const topicsCollectionRef = collection(db, 'topics');
+  const topicQuery = query(
+    topicsCollectionRef,
+    where('name', '==', topicName),
+    where('userId', '==', userId)
+  );
+
+  try {
+    const querySnapshot = await getDocs(topicQuery);
+    if (!querySnapshot.empty) {
+      const existingTopic = querySnapshot.docs[0];
+      console.log(`[findOrCreateTopic] Found existing topic with ID: ${existingTopic.id} for topic name "${topicName}" and user ${userId}.`);
+      return existingTopic.id;
+    } else {
+      console.log(`[findOrCreateTopic] Topic "${topicName}" not found for user ${userId}. Creating new topic.`);
+      const newTopicData = {
+        name: topicName,
+        userId: userId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const newTopicRef = await addDoc(topicsCollectionRef, newTopicData);
+      console.log(`[findOrCreateTopic] Created new topic with ID: ${newTopicRef.id} for topic name "${topicName}" and user ${userId}.`);
+      return newTopicRef.id;
+    }
+  } catch (error) {
+    console.error(`[findOrCreateTopic] Error finding or creating topic "${topicName}" for user ${userId}:`, error);
+    if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
+      console.error(`--------------------------------------------------------------------------------`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'topics' collection for auto topic creation/lookup.`);
+      console.error(`Query involved: where('name', '==', '${topicName}'), where('userId', '==', '${userId}')`);
+      console.error(`Suggested index fields: userId (ASC), name (ASC) OR name (ASC), userId (ASC) on 'topics' collection.`);
+      console.error(`The error message usually provides a direct link: ${error.message}`);
+      console.error(`--------------------------------------------------------------------------------`);
+    }
+    return null; 
+  }
+}
+
+
 export async function addQuestionAction(data: AddQuestionFormInput): Promise<ActionResult> {
   if (!data.userId) {
     return { success: false, message: "User not authenticated.", error: "User ID is missing." };
@@ -47,13 +89,20 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
   }
 
   try {
+    const topicId = await findOrCreateTopic(validationResult.data.topicName, validationResult.data.userId);
+    // We proceed to add the question even if topicId is null (i.e., topic creation/finding failed).
+    // The question will still have `topicName`.
+    if (!topicId) {
+      console.warn(`[addQuestionAction] Failed to find or create topic "${validationResult.data.topicName}" for user ${validationResult.data.userId}. Question will still be added with topicName.`);
+    }
+
     const questionData = {
       title: validationResult.data.title,
       link: validationResult.data.link,
       description: validationResult.data.description,
       difficulty: validationResult.data.difficulty,
       platform: validationResult.data.platform,
-      topicName: validationResult.data.topicName,
+      topicName: validationResult.data.topicName, 
       comments: validationResult.data.comments,
       userId: validationResult.data.userId,
       createdAt: serverTimestamp(),
@@ -71,7 +120,6 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
     revalidatePath('/'); 
     revalidatePath('/questions'); 
     revalidatePath('/topics'); 
-    // No longer revalidating specific topic detail page here, it will refetch on navigation.
     revalidatePath('/streak'); 
 
 
@@ -105,11 +153,9 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
       questionsCollection,
       where("topicName", "==", topicName),
       where("userId", "==", userId)
-      // orderBy("createdAt", "desc") // Removed to simplify, requires index: topicName (ASC), userId (ASC), createdAt (DESC)
-                                     // or topicName (ASC), userId (ASC) and then client-side sort.
     );
 
-    console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q.type, q);
+    console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q);
 
     const querySnapshot = await getDocs(q);
     console.log(`[getQuestionsByTopicNameAction] Found ${querySnapshot.size} questions for topic "${topicName}", userId: ${userId}`);
@@ -130,15 +176,16 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
         updatedAt: parseTimestampToDate(data.updatedAt),
       } as QuestionDocument;
     });
+    // Sort client-side if needed, e.g., by createdAt
+    questions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return questions;
   } catch (error) {
     console.error(`[getQuestionsByTopicNameAction] Error fetching questions for topic "${topicName}", user "${userId}": `, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection for Topic Detail Page.`);
-      console.error(`Needed for query: where("topicName", "==", "${topicName}") AND where("userId", "==", "${userId}").`);
-      console.error(`Suggested index fields: topicName (ASC), userId (ASC)`);
-      console.error(`Or: userId (ASC), topicName (ASC)`);
+      console.error(`Query involved: where("topicName", "==", "${topicName}") AND where("userId", "==", "${userId}").`);
+      console.error(`Suggested index fields: topicName (ASC), userId (ASC) OR userId (ASC), topicName (ASC) on 'questions' collection.`);
       console.error(`The error message usually provides a direct link: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
     }
@@ -157,9 +204,8 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     const q = query(
       questionsCollection,
       where("userId", "==", userId)
-      // orderBy("createdAt", "desc") // Temporarily removed. Requires composite index: userId (ASC), createdAt (DESC)
     );
-    console.log(`[getAllQuestionsAction] Constructed Firestore query for user "${userId}":`, q.type, q);
+    console.log(`[getAllQuestionsAction] Constructed Firestore query for user "${userId}":`, q);
     const querySnapshot = await getDocs(q);
     console.log(`[getAllQuestionsAction] Found ${querySnapshot.size} questions for userId: ${userId}`);
 
@@ -179,15 +225,17 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
         updatedAt: parseTimestampToDate(data.updatedAt),
       } as QuestionDocument;
     });
+    // Sort client-side by createdAt if desired, as orderBy was removed to avoid mandatory index
+    questions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return questions;
   } catch (error) {
     console.error(`[getAllQuestionsAction] Error fetching all questions for user ${userId}:`, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
-      console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection to list all questions for a user.`);
-      console.error(`This usually occurs if you try to order by a field (e.g. 'createdAt') while filtering by 'userId'.`);
-      console.error(`Suggested index fields (if ordering by createdAt): userId (ASC), createdAt (DESC)`);
-      console.error(`If not ordering, a simple query by 'userId' usually doesn't require a custom index if it's a basic equality check, but Firestore's behavior can vary.`);
+      console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection to list all questions for a user (even without explicit orderBy).`);
+      console.error(`Query: where("userId", "==", "${userId}").`);
+      console.error(`A simple equality query on 'userId' usually doesn't require a custom index, but if combined with implicit sorts or other conditions, Firestore might demand one.`);
+      console.error(`If you intend to sort by 'createdAt', the index would be: userId (ASC), createdAt (DESC).`);
       console.error(`The error message usually provides a direct link: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
     }
@@ -220,7 +268,6 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`FIRESTORE INDEX REQUIRED for 'questions' collection for aggregating dashboard data.`);
       console.error(`Query involved: where("userId", "==", "${userId}").`);
-      console.error(`A simple equality query on 'userId' might sometimes need an index depending on Firestore's planner or if other implicit sorts are involved.`);
       console.error(`The error message usually provides a direct link: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
     }
@@ -263,5 +310,3 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     totalSolved: questions.length
   };
 }
-    
-    
