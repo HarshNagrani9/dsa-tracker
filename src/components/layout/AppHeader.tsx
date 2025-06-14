@@ -32,17 +32,20 @@ export function AppHeader() {
       <div className="flex items-center gap-2">
         {user && (
           <Dialog open={isAddQuestionDialogOpen} onOpenChange={setIsAddQuestionDialogOpen}>
+            {/* Desktop Trigger */}
             <DialogTrigger asChild>
-              <>
-                <Button size="sm" className="hidden sm:flex">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Question
-                </Button>
-                <Button size="icon" variant="ghost" className="sm:hidden">
-                  <Plus className="h-5 w-5" />
-                  <span className="sr-only">Add Question</span>
-                </Button>
-              </>
+              <Button size="sm" className="hidden sm:flex">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+              </Button>
             </DialogTrigger>
+            {/* Mobile Trigger */}
+            <DialogTrigger asChild>
+              <Button size="icon" variant="ghost" className="sm:hidden">
+                <Plus className="h-5 w-5" />
+                <span className="sr-only">Add Question</span>
+              </Button>
+            </DialogTrigger>
+            
             <DialogContent className="sm:max-w-[625px]">
               <DialogHeader>
                 <DialogTitle>Add New Question</DialogTitle>
