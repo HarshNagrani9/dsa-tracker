@@ -1,18 +1,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart as BarChartIcon, LineChart as LineChartIcon, PieChartIcon as PieChartIconLucide, Activity, CalendarClock } from "lucide-react";
-import { collection, getDocs, query, where, Timestamp, orderBy } from "firebase/firestore";
+import { BarChart as BarChartIcon, Activity, CalendarClock, Star } from "lucide-react";
+import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import type { QuestionDocument, Difficulty, Platform } from "@/lib/types";
 import { DIFFICULTIES, PLATFORMS } from "@/lib/constants";
 import { DifficultyChart } from "@/components/dashboard/DifficultyChart";
 import { PlatformChart } from "@/components/dashboard/PlatformChart";
 import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
+import { getStreakDataAction } from "@/lib/actions/streakActions";
+import { format, parseISO } from 'date-fns';
+
 
 async function getTotalQuestionsSolved(): Promise<number> {
   try {
     const questionsCollection = collection(db, "questions");
-    // Added orderBy for consistency, though size is the main interest
     const q = query(questionsCollection, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
     return querySnapshot.size;
@@ -22,14 +24,6 @@ async function getTotalQuestionsSolved(): Promise<number> {
   }
 }
 
-async function getCurrentStreak(): Promise<number> {
-  // TODO: Implement actual streak calculation from an 'activityLog' collection.
-  // This would involve checking consecutive days with logged activity.
-  // For now, this is a placeholder.
-  console.log("Streak calculation needs to be implemented with actual data source.");
-  return 0; // Placeholder
-}
-
 async function getQuestionAggregates(): Promise<{
   difficultyData: { name: string; count: number; fill: string }[];
   platformData: { name: string; count: number; fill: string }[];
@@ -37,7 +31,7 @@ async function getQuestionAggregates(): Promise<{
   let questions: Partial<QuestionDocument>[] = [];
   try {
     const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, orderBy("createdAt", "desc")); // Added orderBy
+    const q = query(questionsCollection, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
     questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
   } catch (error) {
@@ -79,14 +73,14 @@ async function getQuestionAggregates(): Promise<{
 export default async function DashboardPage() {
   const totalSolved = await getTotalQuestionsSolved();
   const upcomingContests = await getUpcomingContestsCountAction();
-  const currentStreak = await getCurrentStreak();
+  const streakData = await getStreakDataAction();
   const { difficultyData, platformData } = await getQuestionAggregates();
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold tracking-tight font-headline">Dashboard</h1>
       
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Questions Solved</CardTitle>
@@ -103,8 +97,23 @@ export default async function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{currentStreak} Days</div>
-            <p className="text-xs text-muted-foreground">{currentStreak > 0 ? "Keep the fire burning!" : "Start your streak today!"}</p>
+            <div className="text-2xl font-bold">{streakData.currentStreak} Day{streakData.currentStreak === 1 ? '' : 's'}</div>
+            <p className="text-xs text-muted-foreground">
+                {streakData.currentStreak > 0 ? "Keep the fire burning!" : "Start your streak today!"}
+            </p>
+            {streakData.currentStreak > 0 && streakData.lastActivityDate && (
+                <p className="text-xs text-muted-foreground mt-1">Last active: {format(parseISO(streakData.lastActivityDate), 'MMM d')}</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Max Streak</CardTitle>
+            <Star className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{streakData.maxStreak} Day{streakData.maxStreak === 1 ? '' : 's'}</div>
+            <p className="text-xs text-muted-foreground">Your longest period of consistency.</p>
           </CardContent>
         </Card>
         <Card>

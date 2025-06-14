@@ -6,6 +6,7 @@ import { AddQuestionSchema } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
 import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
+import { updateStreakOnActivityAction } from './streakActions';
 
 interface ActionResult {
   success: boolean;
@@ -51,9 +52,19 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 
     await addDoc(collection(db, "questions"), questionData);
 
+    try {
+      await updateStreakOnActivityAction();
+      revalidatePath('/');
+      revalidatePath('/streak');
+    } catch (streakError) {
+      console.error("Error updating streak data after adding question: ", streakError);
+      // Optionally, decide if this error should affect the overall success message.
+      // For now, the question is added, but streak update might have failed.
+    }
+
     revalidatePath('/questions');
-    revalidatePath('/');
-    revalidatePath('/topics');
+    revalidatePath('/topics'); 
+    // Note: revalidatePath('/') for dashboard (streak card) is now handled after streak update
 
     return {
       success: true,
@@ -76,13 +87,15 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 export async function getQuestionsByTopicNameAction(topicName: string): Promise<QuestionDocument[]> {
   try {
     const questionsCollection = collection(db, "questions");
+    // Removed orderBy to avoid mandatory index for now, per user request.
+    // For sorting, an index on topicName (asc) and createdAt (desc) would be needed.
     const q = query(
       questionsCollection,
       where("topicName", "==", topicName)
-      // orderBy("createdAt", "desc") // Ensure this is commented out or removed if index isn't created
     );
 
     console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}":`, q);
+
 
     const querySnapshot = await getDocs(q);
 
@@ -107,8 +120,8 @@ export async function getQuestionsByTopicNameAction(topicName: string): Promise<
     if (error instanceof Error && error.message.includes("query requires an index")) {
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`FIRESTORE INDEX REQUIRED for topic "${topicName}"`);
-      console.error(`To fix this, create the index in your Firebase Console.`);
-      console.error(`The error message usually provides a direct link. If not, you need to create a composite index on the 'questions' collection with 'topicName' (Ascending) and potentially 'createdAt' (Descending if you want sorting).`);
+      console.error(`To fix this, create the index in your Firebase Console. You might need an index on 'topicName' or a composite index if sorting is re-enabled.`);
+      console.error(`The error message usually provides a direct link. If not, you need to create an index on the 'questions' collection for the 'topicName' field.`);
       console.error(`Original error: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
     }
