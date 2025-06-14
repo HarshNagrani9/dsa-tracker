@@ -3,7 +3,7 @@
 
 import { db } from '@/lib/firebase/config';
 import { AddTopicSchema, type AddTopicFormInput, type TopicDocument } from '@/lib/types';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, doc, getDoc } from 'firebase/firestore';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, doc, getDoc, DocumentData } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -19,19 +19,20 @@ const parseTimestampToDate = (timestampField: any): Date => {
   if (timestampField instanceof Date) {
     return timestampField;
   }
-  // Attempt to parse if it's a string or number representation of a date
   if (typeof timestampField === 'string' || typeof timestampField === 'number') {
     const parsedDate = new Date(timestampField);
     if (!isNaN(parsedDate.getTime())) {
       return parsedDate;
     }
   }
-  // Fallback for unhandled or invalid types
   return new Date(); 
 };
 
 
 export async function addTopicAction(data: AddTopicFormInput): Promise<ActionResult> {
+  if (!data.userId) {
+    return { success: false, message: "User not authenticated.", error: "User ID is missing." };
+  }
   const validationResult = AddTopicSchema.safeParse(data);
 
   if (!validationResult.success) {
@@ -45,7 +46,8 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
 
   try {
     const topicData = {
-      ...validationResult.data,
+      name: validationResult.data.name,
+      userId: validationResult.data.userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -70,26 +72,35 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
   }
 }
 
-export async function getTopicsAction(): Promise<TopicDocument[]> {
+export async function getTopicsAction(userId: string | null | undefined): Promise<TopicDocument[]> {
+  if (!userId) return [];
   try {
     const topicsCollectionRef = collection(db, 'topics');
-    const topicsQuery = query(topicsCollectionRef, orderBy('name', 'asc'));
+    const topicsQuery = query(
+      topicsCollectionRef, 
+      where('userId', '==', userId),
+      orderBy('name', 'asc')
+    );
     const topicsSnapshot = await getDocs(topicsQuery);
 
     const topicsData: TopicDocument[] = [];
 
     for (const topicDoc of topicsSnapshot.docs) {
-      const topic = topicDoc.data();
+      const topic = topicDoc.data() as DocumentData;
       const topicName = topic.name;
 
-      // Query for questions count for this topic
-      const questionsQuery = query(collection(db, "questions"), where("topicName", "==", topicName));
+      const questionsQuery = query(
+        collection(db, "questions"), 
+        where("topicName", "==", topicName),
+        where("userId", "==", userId)
+      );
       const questionsSnapshot = await getDocs(questionsQuery);
       const questionCount = questionsSnapshot.size;
 
       topicsData.push({
         id: topicDoc.id,
         name: topicName,
+        userId: topic.userId,
         createdAt: parseTimestampToDate(topic.createdAt),
         updatedAt: parseTimestampToDate(topic.updatedAt),
         questionCount: questionCount,
@@ -103,19 +114,24 @@ export async function getTopicsAction(): Promise<TopicDocument[]> {
 }
 
 
-export async function getTopicByIdAction(topicId: string): Promise<TopicDocument | null> {
+export async function getTopicByIdAction(topicId: string, userId: string | null | undefined): Promise<TopicDocument | null> {
+  if (!userId) return null;
   try {
     const topicDocRef = doc(db, 'topics', topicId);
     const topicDocSnap = await getDoc(topicDocRef);
 
     if (topicDocSnap.exists()) {
-      const data = topicDocSnap.data();
+      const data = topicDocSnap.data() as DocumentData;
+      if (data.userId !== userId) {
+        console.log("User not authorized to view this topic.");
+        return null; // Or throw an error
+      }
       return {
         id: topicDocSnap.id,
         name: data.name,
+        userId: data.userId,
         createdAt: parseTimestampToDate(data.createdAt),
         updatedAt: parseTimestampToDate(data.updatedAt),
-        // questionCount is not typically fetched here, but could be if needed
       };
     } else {
       console.log("No such topic document!");

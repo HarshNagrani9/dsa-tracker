@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface AddTopicFormProps {
   onFormSubmitSuccess: () => void;
@@ -25,25 +26,42 @@ interface AddTopicFormProps {
 
 export function AddTopicForm({ onFormSubmitSuccess }: AddTopicFormProps) {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<AddTopicFormInput>({
     resolver: zodResolver(AddTopicSchema),
     defaultValues: {
       name: '',
+      userId: '', // Will be set from auth context
     },
   });
 
+  React.useEffect(() => {
+    if (user) {
+      form.setValue('userId', user.uid);
+    }
+  }, [user, form]);
+
   async function onSubmit(values: AddTopicFormInput) {
+    if (!user?.uid) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to add a topic.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const result = await addTopicAction(values);
+      // Ensure userId is correctly passed from form values, which should be set by useEffect
+      const result = await addTopicAction({ ...values, userId: user.uid });
       if (result.success) {
         toast({
           title: 'Success',
           description: result.message,
         });
-        form.reset();
+        form.reset({ name: '', userId: user.uid }); // Reset form but keep userId if user is still logged in
         onFormSubmitSuccess();
       } else {
         toast({
@@ -80,8 +98,13 @@ export function AddTopicForm({ onFormSubmitSuccess }: AddTopicFormProps) {
             </FormItem>
           )}
         />
+        <FormField
+          control={form.control}
+          name="userId"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || authLoading || !user}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Adding...' : 'Add Topic'}
           </Button>

@@ -1,6 +1,8 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/providers/ThemeProvider';
+import { AuthProvider } from '@/providers/AuthProvider';
 import { Toaster } from '@/components/ui/toaster';
 import { AppShell } from '@/components/layout/AppShell';
 
@@ -28,8 +30,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>{children}</AppShell>
-          <Toaster />
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+            <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

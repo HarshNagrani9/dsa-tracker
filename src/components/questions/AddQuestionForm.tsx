@@ -28,6 +28,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface AddQuestionFormProps {
   onFormSubmitSuccess: () => void;
@@ -35,6 +36,7 @@ interface AddQuestionFormProps {
 
 export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<AddQuestionFormInput>({
@@ -47,19 +49,37 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
       platform: undefined,
       topicName: '',
       comments: '',
+      userId: '', // Will be set from auth context
     },
   });
 
+  React.useEffect(() => {
+    if (user) {
+      form.setValue('userId', user.uid);
+    }
+  }, [user, form]);
+
   async function onSubmit(values: AddQuestionFormInput) {
+    if (!user?.uid) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to add a question.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const result = await addQuestionAction(values);
+      const result = await addQuestionAction({ ...values, userId: user.uid });
       if (result.success) {
         toast({
           title: 'Success',
           description: result.message,
         });
-        form.reset();
+        form.reset({ 
+          title: '', link: '', description: '', difficulty: undefined, 
+          platform: undefined, topicName: '', comments: '', userId: user.uid 
+        });
         onFormSubmitSuccess();
       } else {
         toast({
@@ -212,9 +232,13 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
             </FormItem>
           )}
         />
-        
+        <FormField
+          control={form.control}
+          name="userId"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || authLoading || !user}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Adding...' : 'Add Question'}
           </Button>

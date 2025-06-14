@@ -15,10 +15,12 @@ export interface NavItem {
 // Topic Types
 export const AddTopicSchema = z.object({
   name: z.string().min(1, { message: "Topic name cannot be empty." }).max(100, {message: "Topic name too long."}),
+  userId: z.string({ required_error: "User ID is required."})
 });
 export type AddTopicFormInput = z.infer<typeof AddTopicSchema>;
-export interface TopicDocument extends AddTopicFormInput {
+export interface TopicDocument extends Omit<AddTopicFormInput, 'userId'> { // userId is part of the doc, not directly in this type if always fetched for a user
   id: string;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
   questionCount?: number;
@@ -37,10 +39,12 @@ export const AddQuestionSchema = z.object({
   platform: z.enum(PLATFORMS, { required_error: "Platform is required." }),
   topicName: z.string().min(1, { message: "Topic name is required." }).max(100, {message: "Topic name too long."}),
   comments: z.string().max(500, {message: "Comments too long."}).optional(),
+  userId: z.string({ required_error: "User ID is required."})
 });
 export type AddQuestionFormInput = z.infer<typeof AddQuestionSchema>;
-export interface QuestionDocument extends AddQuestionFormInput {
+export interface QuestionDocument extends Omit<AddQuestionFormInput, 'userId'> {
   id: string;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,28 +57,40 @@ export const AddContestSchema = z.object({
   platform: z.enum(PLATFORMS, { required_error: "Platform is required." }),
   date: z.date({ required_error: "Contest date is required." }),
   startTime: z.string().regex(timeRegex, "Invalid start time format (HH:MM)."),
-  endTime: z.string().regex(timeRegex, "Invalid end time format (HH:MM).")
+  endTime: z.string().regex(timeRegex, "Invalid end time format (HH:MM)."),
+  userId: z.string({ required_error: "User ID is required."})
 }).refine(data => {
-  return true;
+  // Basic time validation, can be improved if needed
+  return true; // Assuming valid times for now, or add more complex validation
 }, {
-  message: "End time must be after start time.",
+  message: "End time must be after start time.", // This part is hard to validate without parsing time properly relative to date.
   path: ["endTime"],
 });
 
 export type AddContestFormInput = z.infer<typeof AddContestSchema>;
 
-export interface ContestDocument {
-  id: string;
+// Firestore document structure (server-side)
+export interface ContestDocumentFirestore {
+  id?: string; // id is usually not stored in the document itself but is the doc key
   title: string;
   platform: Platform;
   date: Timestamp; 
   startTime: string; 
   endTime: string; 
+  userId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
-export interface ContestDocumentClient extends Omit<ContestDocument, 'date' | 'createdAt' | 'updatedAt'> {
+
+// Client-side representation
+export interface ContestDocumentClient {
+  id: string;
+  title: string;
+  platform: Platform;
   date: Date;
+  startTime: string;
+  endTime: string;
+  userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +100,7 @@ export type ActivityLog = {
   id: string;
   date: string; // YYYY-MM-DD
   count: number;
+  userId: string;
 };
 
 // Chart data types
@@ -93,7 +110,15 @@ export interface ChartDataItem {
   fill: string;
 }
 
-// Streak Data
+// Streak Data (Firestore representation)
+export interface StreakDataFirestore {
+  currentStreak: number;
+  maxStreak: number;
+  lastActivityDate: string; // YYYY-MM-DD
+  // userId is the document ID, not a field in the doc
+}
+
+// Streak Data (Client-side representation)
 export interface StreakData {
   currentStreak: number;
   maxStreak: number;

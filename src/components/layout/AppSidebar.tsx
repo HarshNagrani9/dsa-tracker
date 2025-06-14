@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -12,11 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarNav } from "./SidebarNav";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Assuming user profile later
-import { LogOut } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LogOut, LogIn, Loader2 } from "lucide-react";
+import { useAuth } from "@/providers/AuthProvider";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
+  const { user, loading, signInWithGoogle, signOutUser } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -33,20 +37,41 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-2 mt-auto">
         <Separator className="my-2" />
-         {/* Placeholder for user profile/logout - can be expanded later with Firebase Auth */}
         <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:justify-center">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src="https://placehold.co/40x40.png" alt="User" data-ai-hint="user avatar" />
-            <AvatarFallback>U</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-medium">User Name</span>
-            <span className="text-xs text-muted-foreground">user@example.com</span>
-          </div>
-           <Button variant="ghost" size="icon" className="ml-auto group-data-[collapsible=icon]:hidden">
-             <LogOut className="h-4 w-4" />
-             <span className="sr-only">Log out</span>
-           </Button>
+          {loading ? (
+            <>
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="flex-col gap-1 group-data-[collapsible=icon]:hidden">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+            </>
+          ) : user ? (
+            <>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user.photoURL || "https://placehold.co/40x40.png"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
+                <AvatarFallback>{user.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <span className="text-sm font-medium truncate max-w-[120px]">{user.displayName || "User"}</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user.email}</span>
+              </div>
+              <Button variant="ghost" size="icon" className="ml-auto group-data-[collapsible=icon]:hidden" onClick={signOutUser} aria-label="Log out">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Avatar className="h-8 w-8">
+                 <AvatarFallback>G</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col group-data-[collapsible=icon]:hidden flex-1">
+                 <Button onClick={signInWithGoogle} size="sm" className="w-full">
+                    <LogIn className="mr-2 h-4 w-4" /> Sign in
+                 </Button>
+              </div>
+            </>
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>

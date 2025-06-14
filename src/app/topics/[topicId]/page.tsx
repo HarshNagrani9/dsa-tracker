@@ -1,4 +1,6 @@
 
+"use client";
+
 import * as React from 'react';
 import Link from 'next/link';
 import { getTopicByIdAction } from '@/lib/actions/topicActions';
@@ -7,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ExternalLink, ListFilter } from 'lucide-react';
+import { ArrowLeft, ExternalLink, ListFilter, User } from 'lucide-react';
 import { format } from 'date-fns';
-import type { QuestionDocument } from '@/lib/types';
+import type { QuestionDocument, TopicDocument } from '@/lib/types';
+import { useAuth } from '@/providers/AuthProvider';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface TopicDetailPageProps {
   params: {
@@ -17,20 +21,96 @@ interface TopicDetailPageProps {
   };
 }
 
-export default async function TopicDetailPage({ params }: TopicDetailPageProps) {
+export default function TopicDetailPage({ params }: TopicDetailPageProps) {
   const { topicId } = params;
-  const topic = await getTopicByIdAction(topicId);
+  const { user, loading: authLoading } = useAuth();
   
-  let questions: QuestionDocument[] = [];
-  if (topic && topic.name) {
-    questions = await getQuestionsByTopicNameAction(topic.name);
+  const [topic, setTopic] = React.useState<TopicDocument | null>(null);
+  const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    async function fetchTopicData() {
+      if (user?.uid && topicId) {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const fetchedTopic = await getTopicByIdAction(topicId, user.uid);
+          if (fetchedTopic) {
+            setTopic(fetchedTopic);
+            const fetchedQuestions = await getQuestionsByTopicNameAction(fetchedTopic.name, user.uid);
+            setQuestions(fetchedQuestions);
+          } else {
+            setError("Topic not found or you're not authorized to view it.");
+            setTopic(null);
+            setQuestions([]);
+          }
+        } catch (e) {
+          console.error("Error fetching topic details:", e);
+          setError("Failed to load topic details.");
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!authLoading) { // User not logged in or no topicId
+        setIsLoading(false);
+        setTopic(null);
+        setQuestions([]);
+        if (!user) setError("Please sign in to view topic details.");
+      }
+    }
+    fetchTopicData();
+  }, [topicId, user, authLoading]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-10 w-10 rounded-md" />
+          <Skeleton className="h-10 w-1/2" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-2xl font-bold mb-2">Topic Details</h1>
+        <p className="text-muted-foreground">Please sign in to view this topic.</p>
+         <Button asChild className="mt-4">
+          <Link href="/topics">Back to Topics</Link>
+        </Button>
+      </div>
+    );
+  }
+  
+  if (error) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <h1 className="text-2xl font-bold text-destructive">{error}</h1>
+        <Button asChild className="mt-4">
+          <Link href="/topics">Back to Topics</Link>
+        </Button>
+      </div>
+    );
   }
 
   if (!topic) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center">
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
         <h1 className="text-2xl font-bold">Topic Not Found</h1>
-        <p className="text-muted-foreground">The topic you are looking for does not exist.</p>
+        <p className="text-muted-foreground">The topic you are looking for does not exist or you might not have access.</p>
         <Button asChild className="mt-4">
           <Link href="/topics">Back to Topics</Link>
         </Button>
@@ -121,11 +201,3 @@ export default async function TopicDetailPage({ params }: TopicDetailPageProps) 
     </div>
   );
 }
-
-// Optional: Generate static paths if you have a fixed number of topics and want to pre-render them
-// export async function generateStaticParams() {
-//   const topics = await getTopicsAction();
-//   return topics.map((topic) => ({
-//     topicId: topic.id,
-//   }));
-// }

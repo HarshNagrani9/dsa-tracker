@@ -1,12 +1,77 @@
 
+"use client";
+
+import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Flame, Star, CalendarDays } from "lucide-react";
+import { Flame, Star, CalendarDays, User } from "lucide-react";
 import Image from 'next/image';
 import { getStreakDataAction } from '@/lib/actions/streakActions';
+import type { StreakData } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
+import { useAuth } from '@/providers/AuthProvider';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default async function StreakPage() {
-  const streakData = await getStreakDataAction();
+export default function StreakPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [streakData, setStreakData] = React.useState<StreakData | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchStreakData() {
+      if (user?.uid) {
+        setIsLoading(true);
+        try {
+          const data = await getStreakDataAction(user.uid);
+          setStreakData(data);
+        } catch (error) {
+          console.error("Error fetching streak data:", error);
+          setStreakData({ currentStreak: 0, maxStreak: 0, lastActivityDate: '' });
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!authLoading) {
+        setStreakData(null);
+        setIsLoading(false);
+      }
+    }
+    fetchStreakData();
+  }, [user, authLoading]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex flex-col gap-8">
+        <div className="text-center">
+          <Skeleton className="h-10 w-1/2 mx-auto mb-2" />
+          <Skeleton className="h-6 w-3/4 mx-auto" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-56 rounded-lg" />
+          <Skeleton className="h-56 rounded-lg" />
+        </div>
+        <Skeleton className="h-40 rounded-lg" />
+        <Skeleton className="h-60 rounded-lg" />
+      </div>
+    );
+  }
+
+  if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-2xl font-bold mb-2">Your Streaks</h1>
+        <p className="text-muted-foreground">Please sign in to view and track your streaks.</p>
+      </div>
+    );
+  }
+  
+  if (!streakData) {
+    // This case might occur briefly or if there's an issue fetching data for a logged-in user
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <h1 className="text-2xl font-bold">Loading Streak Data...</h1>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -67,7 +132,7 @@ export default async function StreakPage() {
       </div>
 
       {streakData.currentStreak === 0 && (
-        <Card className="mt-0"> {/* Removed mt-4 to align better if it's the only card below */}
+        <Card className="mt-0">
             <CardContent className="pt-6">
                  <div className="p-6 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center">
                     <Flame className="h-16 w-16 text-muted-foreground mb-4 opacity-50" />

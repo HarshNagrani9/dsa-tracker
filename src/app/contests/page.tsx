@@ -1,22 +1,79 @@
 
+"use client";
+
 import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Trophy, CalendarDays } from "lucide-react";
+import { Trophy, User } from "lucide-react";
 import { getContestsAction } from '@/lib/actions/contestActions';
 import type { ContestDocumentClient } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { AddContestDialog } from '@/components/contests/AddContestDialog';
+import { useAuth } from '@/providers/AuthProvider';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default async function ContestsPage() {
-  const contests = await getContestsAction();
+export default function ContestsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [contests, setContests] = React.useState<ContestDocumentClient[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchContests() {
+      if (user?.uid) {
+        setIsLoading(true);
+        try {
+          const userContests = await getContestsAction(user.uid);
+          setContests(userContests);
+        } catch (error) {
+          console.error("Error fetching contests:", error);
+          setContests([]);
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!authLoading) {
+        setContests([]);
+        setIsLoading(false);
+      }
+    }
+    fetchContests();
+  }, [user, authLoading]);
+
+  if (authLoading || (isLoading && !contests.length && !user)) {
+     return (
+      <div className="flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-1/4" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/2 mb-2" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-2xl font-bold mb-2">Your Contests</h1>
+        <p className="text-muted-foreground">Please sign in to manage and view your contests.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight font-headline">Contests</h1>
-        <AddContestDialog />
+        {user && <AddContestDialog />}
       </div>
       
       <Card>
@@ -27,7 +84,9 @@ export default async function ContestsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {contests.length > 0 ? (
+           {isLoading && contests.length === 0 ? (
+             <Skeleton className="h-64 w-full" />
+          ) : contests.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -44,7 +103,6 @@ export default async function ContestsPage() {
                   const today = new Date();
                   today.setHours(0,0,0,0);
                   
-                  // Create a new Date object from contest.date to avoid modifying the original
                   const normalizedContestDate = new Date(contest.date);
                   normalizedContestDate.setHours(0,0,0,0);
 

@@ -1,80 +1,98 @@
 
+"use client";
+
+import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart as BarChartIcon, Activity, CalendarClock, Star } from "lucide-react";
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase/config";
-import type { QuestionDocument, Difficulty, Platform } from "@/lib/types";
-import { DIFFICULTIES, PLATFORMS } from "@/lib/constants";
-import { DifficultyChart } from "@/components/dashboard/DifficultyChart";
-import { PlatformChart } from "@/components/dashboard/PlatformChart";
+import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User } from "lucide-react";
+import { getQuestionAggregatesAction } from "@/lib/actions/questionActions";
 import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 import { getStreakDataAction } from "@/lib/actions/streakActions";
+import type { ChartDataItem, StreakData } from "@/lib/types";
+import { DifficultyChart } from "@/components/dashboard/DifficultyChart";
+import { PlatformChart } from "@/components/dashboard/PlatformChart";
+import { useAuth } from "@/providers/AuthProvider";
 import { format, parseISO } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 
-
-async function getTotalQuestionsSolved(): Promise<number> {
-  try {
-    const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.size;
-  } catch (error) {
-    console.error("Error fetching total questions solved:", error);
-    return 0;
-  }
+interface DashboardData {
+  totalSolved: number;
+  upcomingContests: number;
+  streakData: StreakData;
+  difficultyData: ChartDataItem[];
+  platformData: ChartDataItem[];
 }
 
-async function getQuestionAggregates(): Promise<{
-  difficultyData: { name: string; count: number; fill: string }[];
-  platformData: { name: string; count: number; fill: string }[];
-}> {
-  let questions: Partial<QuestionDocument>[] = [];
-  try {
-    const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
-  } catch (error) {
-    console.error("Error fetching questions for aggregation:", error);
+export default function DashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [dashboardData, setDashboardData] = React.useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchData() {
+      if (user?.uid) {
+        setIsLoading(true);
+        try {
+          const [aggregates, upcomingContests, streak] = await Promise.all([
+            getQuestionAggregatesAction(user.uid),
+            getUpcomingContestsCountAction(user.uid),
+            getStreakDataAction(user.uid),
+          ]);
+          setDashboardData({
+            totalSolved: aggregates.totalSolved,
+            difficultyData: aggregates.difficultyData,
+            platformData: aggregates.platformData,
+            upcomingContests,
+            streakData: streak,
+          });
+        } catch (error) {
+          console.error("Error fetching dashboard data:", error);
+          // Optionally set error state to display an error message
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!authLoading) { // User is not logged in, and auth is not loading
+        setDashboardData(null); // Clear data or set to a default logged-out state
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, [user, authLoading]);
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-10 w-1/3" />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-80 rounded-lg" />
+          <Skeleton className="h-80 rounded-lg" />
+        </div>
+      </div>
+    );
   }
 
-  const difficultyCounts: Record<Difficulty, number> = { Easy: 0, Medium: 0, Hard: 0 };
-  const platformCounts: Record<Platform, number> = { 
-    LeetCode: 0, CSES: 0, CodeChef: 0, Codeforces: 0, Other: 0 
-  };
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-3xl font-bold tracking-tight font-headline mb-2">Welcome to DSA Tracker</h1>
+        <p className="text-xl text-muted-foreground mb-6">Please sign in to track your progress and view your dashboard.</p>
+        {/* The sign-in button is in the sidebar, but could be duplicated here if desired */}
+      </div>
+    );
+  }
 
-  questions.forEach(q => {
-    if (q.difficulty && difficultyCounts[q.difficulty] !== undefined) {
-      difficultyCounts[q.difficulty]++;
-    }
-    if (q.platform && platformCounts[q.platform] !== undefined) {
-      platformCounts[q.platform]++;
-    } else if (q.platform) { 
-      platformCounts.Other = (platformCounts.Other || 0) + 1;
-    }
-  });
+  if (!dashboardData) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <h1 className="text-2xl font-bold">Loading Dashboard...</h1>
+        <p className="text-muted-foreground">If this takes too long, please try refreshing.</p>
+      </div>
+    );
+  }
 
-  const finalDifficultyData = DIFFICULTIES.map((diff, index) => ({
-    name: diff,
-    count: difficultyCounts[diff],
-    fill: `hsl(var(--chart-${index + 1}))`,
-  }));
-  
-  const finalPlatformData = PLATFORMS.map((plat, index) => ({
-    name: plat,
-    count: platformCounts[plat] || 0, 
-    fill: `hsl(var(--chart-${(index % 5) + 1}))`,
-  }));
-
-  return { difficultyData: finalDifficultyData, platformData: finalPlatformData };
-}
-
-
-export default async function DashboardPage() {
-  const totalSolved = await getTotalQuestionsSolved();
-  const upcomingContests = await getUpcomingContestsCountAction();
-  const streakData = await getStreakDataAction();
-  const { difficultyData, platformData } = await getQuestionAggregates();
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,7 +105,7 @@ export default async function DashboardPage() {
             <BarChartIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalSolved}</div>
+            <div className="text-2xl font-bold">{dashboardData.totalSolved}</div>
             <p className="text-xs text-muted-foreground">Across all topics and platforms.</p>
           </CardContent>
         </Card>
@@ -97,12 +115,12 @@ export default async function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{streakData.currentStreak} Day{streakData.currentStreak === 1 ? '' : 's'}</div>
+            <div className="text-2xl font-bold">{dashboardData.streakData.currentStreak} Day{dashboardData.streakData.currentStreak === 1 ? '' : 's'}</div>
             <p className="text-xs text-muted-foreground">
-                {streakData.currentStreak > 0 ? "Keep the fire burning!" : "Start your streak today!"}
+                {dashboardData.streakData.currentStreak > 0 ? "Keep the fire burning!" : "Start your streak today!"}
             </p>
-            {streakData.currentStreak > 0 && streakData.lastActivityDate && (
-                <p className="text-xs text-muted-foreground mt-1">Last active: {format(parseISO(streakData.lastActivityDate), 'MMM d')}</p>
+            {dashboardData.streakData.currentStreak > 0 && dashboardData.streakData.lastActivityDate && (
+                <p className="text-xs text-muted-foreground mt-1">Last active: {format(parseISO(dashboardData.streakData.lastActivityDate), 'MMM d')}</p>
             )}
           </CardContent>
         </Card>
@@ -112,7 +130,7 @@ export default async function DashboardPage() {
             <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{streakData.maxStreak} Day{streakData.maxStreak === 1 ? '' : 's'}</div>
+            <div className="text-2xl font-bold">{dashboardData.streakData.maxStreak} Day{dashboardData.streakData.maxStreak === 1 ? '' : 's'}</div>
             <p className="text-xs text-muted-foreground">Your longest period of consistency.</p>
           </CardContent>
         </Card>
@@ -122,8 +140,8 @@ export default async function DashboardPage() {
             <CalendarClock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{upcomingContests}</div>
-             <p className="text-xs text-muted-foreground">{upcomingContests > 0 ? "Check the contests page." : "No upcoming contests tracked."}</p>
+            <div className="text-2xl font-bold">{dashboardData.upcomingContests}</div>
+             <p className="text-xs text-muted-foreground">{dashboardData.upcomingContests > 0 ? "Check the contests page." : "No upcoming contests tracked."}</p>
           </CardContent>
         </Card>
       </div>
@@ -135,7 +153,7 @@ export default async function DashboardPage() {
             <CardDescription>Distribution of solved questions based on difficulty.</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
-            <DifficultyChart data={difficultyData} />
+            <DifficultyChart data={dashboardData.difficultyData} />
           </CardContent>
         </Card>
         <Card>
@@ -144,7 +162,7 @@ export default async function DashboardPage() {
             <CardDescription>Distribution of solved questions across different platforms.</CardDescription>
           </CardHeader>
           <CardContent>
-             <PlatformChart data={platformData} />
+             <PlatformChart data={dashboardData.platformData} />
           </CardContent>
         </Card>
       </div>

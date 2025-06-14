@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -31,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { PLATFORMS } from '@/lib/constants';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface AddContestFormProps {
   onFormSubmitSuccess: () => void;
@@ -38,6 +38,7 @@ interface AddContestFormProps {
 
 export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const form = useForm<AddContestFormInput>({
@@ -48,19 +49,37 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
       date: undefined,
       startTime: '',
       endTime: '',
+      userId: '', // Will be set from auth context
     },
   });
 
+  React.useEffect(() => {
+    if (user) {
+      form.setValue('userId', user.uid);
+    }
+  }, [user, form]);
+
   async function onSubmit(values: AddContestFormInput) {
+    if (!user?.uid) {
+      toast({
+        title: 'Authentication Error',
+        description: 'You must be logged in to add a contest.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const result = await addContestAction(values);
+      const result = await addContestAction({ ...values, userId: user.uid });
       if (result.success) {
         toast({
           title: 'Success',
           description: result.message,
         });
-        form.reset();
+        form.reset({
+          title: '', platform: undefined, date: undefined, startTime: '',
+          endTime: '', userId: user.uid
+        });
         onFormSubmitSuccess();
       } else {
         toast({
@@ -154,7 +173,7 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
                     selected={field.value}
                     onSelect={field.onChange}
                     disabled={(date) =>
-                      date < new Date(new Date().setDate(new Date().getDate() - 1)) // Disable past dates
+                      date < new Date(new Date().setDate(new Date().getDate() - 1)) 
                     }
                     initialFocus
                   />
@@ -193,9 +212,13 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
             )}
           />
         </div>
-        
+        <FormField
+          control={form.control}
+          name="userId"
+          render={({ field }) => <input type="hidden" {...field} />}
+        />
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting || authLoading || !user}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Adding...' : 'Add Contest'}
           </Button>

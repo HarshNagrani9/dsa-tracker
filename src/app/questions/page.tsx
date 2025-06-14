@@ -1,4 +1,7 @@
 
+"use client";
+
+import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Table,
@@ -9,57 +12,66 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { db } from "@/lib/firebase/config";
-import { collection, getDocs, orderBy, query, Timestamp } from "firebase/firestore";
 import type { QuestionDocument } from "@/lib/types";
 import { format } from 'date-fns';
+import { useAuth } from '@/providers/AuthProvider';
+import { getAllQuestionsAction } from '@/lib/actions/questionActions';
+import { Skeleton } from '@/components/ui/skeleton';
+import { User } from 'lucide-react';
 
-async function getQuestions(): Promise<QuestionDocument[]> {
-  try {
-    const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, orderBy("createdAt", "desc"));
-    const querySnapshot = await getDocs(q);
-    
-    const parseTimestampToDate = (timestampField: any): Date => {
-      if (timestampField instanceof Timestamp) {
-        return timestampField.toDate();
-      }
-      if (timestampField instanceof Date) {
-        return timestampField;
-      }
-      if (typeof timestampField === 'string' || typeof timestampField === 'number') {
-        const parsedDate = new Date(timestampField);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate;
+export default function QuestionsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const [questions, setQuestions] = React.useState<QuestionDocument[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchQuestions() {
+      if (user?.uid) {
+        setIsLoading(true);
+        try {
+          const userQuestions = await getAllQuestionsAction(user.uid);
+          setQuestions(userQuestions);
+        } catch (error) {
+          console.error("Error fetching questions:", error);
+          setQuestions([]);
+        } finally {
+          setIsLoading(false);
         }
+      } else if (!authLoading) {
+        setQuestions([]);
+        setIsLoading(false);
       }
-      return new Date(); 
-    };
+    }
+    fetchQuestions();
+  }, [user, authLoading]);
 
-    const questions = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        title: data.title || '',
-        link: data.link || '',
-        description: data.description || '',
-        difficulty: data.difficulty || 'Easy', 
-        platform: data.platform || 'Other', 
-        topicName: data.topicName || '',
-        comments: data.comments || '',
-        createdAt: parseTimestampToDate(data.createdAt),
-        updatedAt: parseTimestampToDate(data.updatedAt),
-      } as QuestionDocument;
-    });
-    return questions;
-  } catch (error) {
-    console.error("Error fetching questions: ", error);
-    return []; 
+  if (authLoading || (isLoading && !questions.length && !user)) {
+     return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-10 w-1/3 mb-4" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/2 mb-2" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent>
+             <Skeleton className="h-64 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
-}
 
-export default async function QuestionsPage() {
-  const questions = await getQuestions();
+  if (!user && !authLoading) {
+     return (
+      <div className="flex flex-col items-center justify-center h-full text-center py-10">
+        <User className="h-24 w-24 text-muted-foreground mb-6" />
+        <h1 className="text-2xl font-bold mb-2">Your Questions</h1>
+        <p className="text-muted-foreground">Please sign in to manage and view your questions.</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,7 +84,9 @@ export default async function QuestionsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {questions.length > 0 ? (
+          {isLoading && questions.length === 0 ? (
+             <Skeleton className="h-64 w-full" />
+          ): questions.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -124,8 +138,8 @@ export default async function QuestionsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="mt-4 p-8 bg-muted/50 rounded-md flex items-center justify-center">
-              <p className="text-muted-foreground">No questions added yet. Click "Add Question" to get started!</p>
+            <div className="mt-4 p-8 bg-muted/50 rounded-md flex items-center justify-center text-center min-h-[200px]">
+              <p className="text-muted-foreground">No questions added yet. Click "Add Question" in the header to get started!</p>
             </div>
           )}
         </CardContent>
