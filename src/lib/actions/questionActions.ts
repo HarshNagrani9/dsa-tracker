@@ -64,15 +64,16 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 
     try {
       await updateStreakOnActivityAction(validationResult.data.userId);
-      revalidatePath('/');
-      revalidatePath('/streak');
     } catch (streakError) {
       console.error("Error updating streak data after adding question: ", streakError);
+      // Do not let streak error block main success path
     }
 
-    revalidatePath('/questions');
-    revalidatePath(`/topics`); 
-    revalidatePath(`/topics/${validationResult.data.topicName}`); // May need topic ID if path is /topics/[id]
+    // Revalidate paths
+    revalidatePath('/'); // For dashboard aggregates
+    revalidatePath('/questions'); // For the main questions list
+    revalidatePath('/topics'); // For topic list (question counts) & specific topic pages will refetch
+    revalidatePath('/streak'); // For streak display
 
     return {
       success: true,
@@ -93,19 +94,24 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
 }
 
 export async function getQuestionsByTopicNameAction(topicName: string, userId: string | null | undefined): Promise<QuestionDocument[]> {
-  if (!userId) return [];
+  if (!userId) {
+    console.log("[getQuestionsByTopicNameAction] No userId provided, returning empty array.");
+    return [];
+  }
+  console.log(`[getQuestionsByTopicNameAction] Fetching questions for topic "${topicName}", userId: ${userId}`);
   try {
     const questionsCollection = collection(db, "questions");
     const q = query(
       questionsCollection,
       where("topicName", "==", topicName),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc") 
+      where("userId", "==", userId)
+      // orderBy("createdAt", "desc") // Temporarily removed due to index issue, re-add when index is confirmed
     );
 
     console.log(`[getQuestionsByTopicNameAction] Constructed Firestore query for topic "${topicName}", user "${userId}":`, q);
 
     const querySnapshot = await getDocs(q);
+    console.log(`[getQuestionsByTopicNameAction] Found ${querySnapshot.size} questions for topic "${topicName}", userId: ${userId}`);
 
     const questions = querySnapshot.docs.map(doc => {
       const data = doc.data() as DocumentData;
@@ -125,11 +131,13 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
     });
     return questions;
   } catch (error) {
-    console.error(`Error fetching questions for topic "${topicName}", user "${userId}": `, error);
+    console.error(`[getQuestionsByTopicNameAction] Error fetching questions for topic "${topicName}", user "${userId}": `, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`FIRESTORE INDEX REQUIRED for topic "${topicName}" and user "${userId}"`);
-      console.error(`To fix this, create the composite index in your Firebase Console: topicName (ASC), userId (ASC), createdAt (DESC) on the 'questions' collection.`);
+      console.error(`To fix this, create the composite index in your Firebase Console for the 'questions' collection.`);
+      console.error(`Fields for index: topicName (ASC), userId (ASC), createdAt (DESC) - if re-adding sort.`);
+      console.error(`Alternatively: topicName (ASC), userId (ASC) if no sorting on createdAt.`);
       console.error(`The error message usually provides a direct link. If not, you need to manually create it.`);
       console.error(`Original error: ${error.message}`);
       console.error(`--------------------------------------------------------------------------------`);
@@ -139,16 +147,21 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
 }
 
 export async function getAllQuestionsAction(userId: string | null | undefined): Promise<QuestionDocument[]> {
-  if (!userId) return [];
+  if (!userId) {
+    console.log("[getAllQuestionsAction] No userId provided, returning empty array.");
+    return [];
+  }
+  console.log(`[getAllQuestionsAction] Fetching all questions for userId: ${userId}`);
   try {
     const questionsCollection = collection(db, "questions");
     const q = query(
-      questionsCollection, 
+      questionsCollection,
       where("userId", "==", userId),
       orderBy("createdAt", "desc")
     );
     const querySnapshot = await getDocs(q);
-    
+    console.log(`[getAllQuestionsAction] Found ${querySnapshot.size} questions for userId: ${userId}`);
+
     const questions = querySnapshot.docs.map(doc => {
       const data = doc.data() as DocumentData;
       return {
@@ -156,8 +169,8 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
         title: data.title || '',
         link: data.link || '',
         description: data.description || '',
-        difficulty: data.difficulty || 'Easy', 
-        platform: data.platform || 'Other', 
+        difficulty: data.difficulty || 'Easy',
+        platform: data.platform || 'Other',
         topicName: data.topicName || '',
         comments: data.comments || '',
         userId: data.userId,
@@ -167,8 +180,8 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     });
     return questions;
   } catch (error) {
-    console.error("Error fetching all questions for user:", error);
-    return []; 
+    console.error(`[getAllQuestionsAction] Error fetching all questions for user ${userId}:`, error);
+    return [];
   }
 }
 
@@ -178,23 +191,28 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
   platformData: { name: string; count: number; fill: string }[];
   totalSolved: number;
 }> {
-  if (!userId) return { difficultyData: [], platformData: [], totalSolved: 0 };
+  if (!userId) {
+    console.log("[getQuestionAggregatesAction] No userId, returning empty aggregates.");
+    return { difficultyData: [], platformData: [], totalSolved: 0 };
+  }
+  console.log(`[getQuestionAggregatesAction] Aggregating questions for userId: ${userId}`);
 
   let questions: Partial<QuestionDocument>[] = [];
   try {
     const questionsCollection = collection(db, "questions");
-    const q = query(questionsCollection, where("userId", "==", userId), orderBy("createdAt", "desc"));
+    const q = query(questionsCollection, where("userId", "==", userId)); // No orderBy needed for aggregation
     const querySnapshot = await getDocs(q);
     questions = querySnapshot.docs.map(doc => doc.data() as QuestionDocument);
+    console.log(`[getQuestionAggregatesAction] Found ${questions.length} questions to aggregate for userId: ${userId}`);
   } catch (error) {
-    console.error("Error fetching questions for aggregation:", error);
+    console.error(`[getQuestionAggregatesAction] Error fetching questions for aggregation (userId: ${userId}):`, error);
   }
 
   const { DIFFICULTIES, PLATFORMS } = await import('@/lib/constants');
 
   const difficultyCounts: Record<Difficulty, number> = { Easy: 0, Medium: 0, Hard: 0 };
-  const platformCounts: Record<Platform, number> = { 
-    LeetCode: 0, CSES: 0, CodeChef: 0, Codeforces: 0, Other: 0 
+  const platformCounts: Record<Platform, number> = {
+    LeetCode: 0, CSES: 0, CodeChef: 0, Codeforces: 0, Other: 0
   };
 
   questions.forEach(q => {
@@ -203,7 +221,7 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     }
     if (q.platform && platformCounts[q.platform] !== undefined) {
       platformCounts[q.platform]++;
-    } else if (q.platform) { 
+    } else if (q.platform) {
       platformCounts.Other = (platformCounts.Other || 0) + 1;
     }
   });
@@ -213,17 +231,17 @@ export async function getQuestionAggregatesAction(userId: string | null | undefi
     count: difficultyCounts[diff],
     fill: `hsl(var(--chart-${index + 1}))`,
   }));
-  
+
   const finalPlatformData = PLATFORMS.map((plat, index) => ({
     name: plat,
-    count: platformCounts[plat] || 0, 
+    count: platformCounts[plat] || 0,
     fill: `hsl(var(--chart-${(index % 5) + 1}))`,
   }));
 
-  return { 
-    difficultyData: finalDifficultyData, 
+  return {
+    difficultyData: finalDifficultyData,
     platformData: finalPlatformData,
     totalSolved: questions.length
   };
 }
-
+    
