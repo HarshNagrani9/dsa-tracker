@@ -14,13 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarNav } from "./SidebarNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, LogIn, Loader2 } from "lucide-react";
+import { LogOut, LogIn, UserPlus, UserCircle } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function AppSidebar() {
   const { setOpenMobile } = useSidebar();
-  const { user, loading, signInWithGoogle, signOutUser } = useAuth();
+  const { user, loading, signOutUser } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -49,11 +49,15 @@ export function AppSidebar() {
           ) : user ? (
             <>
               <Avatar className="h-8 w-8">
-                <AvatarImage src={user.photoURL || "https://placehold.co/40x40.png"} alt={user.displayName || "User"} data-ai-hint="user avatar" />
-                <AvatarFallback>{user.displayName?.charAt(0).toUpperCase() || 'U'}</AvatarFallback>
+                {user.photoURL ? (
+                  <AvatarImage src={user.photoURL} alt={user.displayName || user.email || "User"} data-ai-hint="user avatar" />
+                ) : null}
+                <AvatarFallback>
+                  {user.email ? user.email.charAt(0).toUpperCase() : <UserCircle className="h-5 w-5" />}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-                <span className="text-sm font-medium truncate max-w-[120px]">{user.displayName || "User"}</span>
+                <span className="text-sm font-medium truncate max-w-[120px]">{user.displayName || user.email?.split('@')[0] || "User"}</span>
                 <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user.email}</span>
               </div>
               <Button variant="ghost" size="icon" className="ml-auto group-data-[collapsible=icon]:hidden" onClick={signOutUser} aria-label="Log out">
@@ -62,12 +66,15 @@ export function AppSidebar() {
             </>
           ) : (
             <>
-              <Avatar className="h-8 w-8">
-                 <AvatarFallback>G</AvatarFallback>
+              <Avatar className="h-8 w-8 bg-muted">
+                 <AvatarFallback><UserCircle className="h-5 w-5 text-muted-foreground" /></AvatarFallback>
               </Avatar>
-              <div className="flex flex-col group-data-[collapsible=icon]:hidden flex-1">
-                 <Button onClick={signInWithGoogle} size="sm" className="w-full">
-                    <LogIn className="mr-2 h-4 w-4" /> Sign in
+              <div className="flex flex-col gap-1 group-data-[collapsible=icon]:hidden flex-1">
+                 <Button asChild size="sm" className="w-full">
+                    <Link href="/signin"><LogIn className="mr-2 h-4 w-4" /> Sign In</Link>
+                 </Button>
+                 <Button asChild variant="outline" size="sm" className="w-full">
+                   <Link href="/signup"><UserPlus className="mr-2 h-4 w-4" /> Sign Up</Link>
                  </Button>
               </div>
             </>

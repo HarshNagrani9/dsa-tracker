@@ -12,6 +12,24 @@ export interface NavItem {
   disabled?: boolean;
 }
 
+// Auth Schemas
+export const SignUpSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters long." }),
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match.",
+  path: ["confirmPassword"], // path of error
+});
+export type SignUpFormInput = z.infer<typeof SignUpSchema>;
+
+export const SignInSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address." }),
+  password: z.string().min(1, { message: "Password cannot be empty." }),
+});
+export type SignInFormInput = z.infer<typeof SignInSchema>;
+
+
 // Topic Types
 export const AddTopicSchema = z.object({
   name: z.string().min(1, { message: "Topic name cannot be empty." }).max(100, {message: "Topic name too long."}),
