@@ -31,29 +31,27 @@ export function SidebarNav({ items, onLinkClick }: SidebarNavProps) {
         
         return (
           <SidebarMenuItem key={index}>
-            <Link href={item.disabled ? "#" : item.href}>
-              <SidebarMenuButton
-                asChild
-                variant="default"
-                className={cn(
-                  "w-full justify-start",
-                  isActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground",
-                  item.disabled && "cursor-not-allowed opacity-80"
+            <SidebarMenuButton
+              asChild
+              variant="default"
+              className={cn(
+                "w-full justify-start",
+                isActive && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground",
+                item.disabled && "cursor-not-allowed opacity-80"
+              )}
+              isActive={isActive}
+              aria-disabled={item.disabled}
+              onClick={onLinkClick} // This onClick is passed to Link by Slot
+              tooltip={{content: item.title, side: "right", align: "center"}}
+            >
+              <Link href={item.disabled ? "#" : item.href} legacyBehavior={false} passHref={false}>
+                <Icon />
+                <span>{item.title}</span>
+                {item.label && (
+                  <span className="ml-auto text-xs">{item.label}</span>
                 )}
-                isActive={isActive}
-                aria-disabled={item.disabled}
-                onClick={onLinkClick}
-                tooltip={{content: item.title, side: "right", align: "center"}}
-              >
-                <>
-                  <Icon />
-                  <span>{item.title}</span>
-                  {item.label && (
-                    <span className="ml-auto text-xs">{item.label}</span>
-                  )}
-                </>
-              </SidebarMenuButton>
-            </Link>
+              </Link>
+            </SidebarMenuButton>
           </SidebarMenuItem>
         );
       })}
