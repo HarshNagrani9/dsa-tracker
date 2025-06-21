@@ -8,9 +8,11 @@ import { BarChart as BarChartIcon, Activity, CalendarClock, Star, User, LineChar
 import { getQuestionAggregatesAction } from "@/lib/actions/questionActions";
 import { getUpcomingContestsCountAction } from "@/lib/actions/contestActions";
 import { getStreakDataAction } from "@/lib/actions/streakActions";
+import { getTopicAggregatesAction } from "@/lib/actions/topicActions";
 import type { ChartDataItem, StreakData } from "@/lib/types";
 import { DifficultyChart } from "@/components/dashboard/DifficultyChart";
 import { PlatformChart } from "@/components/dashboard/PlatformChart";
+import { TopicChart } from "@/components/dashboard/TopicChart";
 import { useAuth } from "@/providers/AuthProvider";
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,6 +25,7 @@ interface DashboardData {
   streakData: StreakData;
   difficultyData: ChartDataItem[];
   platformData: ChartDataItem[];
+  topicData: ChartDataItem[];
 }
 
 export default function DashboardPage() {
@@ -36,10 +39,11 @@ export default function DashboardPage() {
       setIsLoading(true);
       setDashboardData(null); // Clear previous data
       try {
-        const [aggregates, upcomingContests, streak] = await Promise.all([
+        const [aggregates, upcomingContests, streak, topics] = await Promise.all([
           getQuestionAggregatesAction(currentUserId),
           getUpcomingContestsCountAction(currentUserId),
           getStreakDataAction(currentUserId),
+          getTopicAggregatesAction(currentUserId),
         ]);
         setDashboardData({
           totalSolved: aggregates.totalSolved,
@@ -47,6 +51,7 @@ export default function DashboardPage() {
           platformData: aggregates.platformData,
           upcomingContests,
           streakData: streak,
+          topicData: topics,
         });
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -81,6 +86,7 @@ export default function DashboardPage() {
           <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-80 rounded-lg" />
         </div>
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
@@ -124,6 +130,7 @@ export default function DashboardPage() {
           <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-80 rounded-lg" />
         </div>
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
@@ -212,6 +219,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+            <CardTitle>Questions by Topic</CardTitle>
+            <CardDescription>Distribution of solved questions across different topics.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <TopicChart data={dashboardData.topicData} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

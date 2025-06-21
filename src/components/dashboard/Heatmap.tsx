@@ -8,7 +8,7 @@ import { getHeatmapDataAction } from '@/lib/actions/questionActions';
 import type { HeatmapData } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { subYears, startOfDay, endOfDay } from 'date-fns';
+import { subYears, startOfDay, endOfDay, format as formatDate } from 'date-fns';
 
 export function Heatmap() {
   const { user } = useAuth();
@@ -43,6 +43,7 @@ export function Heatmap() {
   const today = new Date();
   const startDate = startOfDay(subYears(today, 1));
   const endDate = endOfDay(today);
+  const todayString = formatDate(today, 'yyyy-MM-dd');
 
   return (
     <Card>
@@ -65,6 +66,9 @@ export function Heatmap() {
                 titleForValue={value => {
                     if (!value || !value.date) {
                         return 'No activity';
+                    }
+                    if (value.date === todayString) {
+                        return `You have solved ${value.count} questions today.`;
                     }
                     return `${value.count} questions on ${value.date}`;
                 }}

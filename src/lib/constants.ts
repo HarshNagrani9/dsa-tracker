@@ -37,7 +37,15 @@ export const SETTINGS_NAV_ITEM: NavItem = {
   icon: Settings,
 };
 
-export const PLATFORMS: Platform[] = ["LeetCode", "CSES", "CodeChef", "Codeforces", "Other"];
-export const DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
+export const PLATFORMS = ["LeetCode", "CSES", "CodeChef", "Codeforces", "Other"] as const;
+export const DIFFICULTIES = ["Easy", "Medium", "Hard"] as const;
+
+export const TOPIC_CHART_COLORS = [
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+];
 
 export const AppLogo = Brain;

@@ -2,9 +2,26 @@
 'use server';
 
 import { db } from '@/lib/firebase/config';
-import { AddTopicSchema, type AddTopicFormInput, type TopicDocument } from '@/lib/types';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, doc, getDoc, DocumentData } from 'firebase/firestore';
+import { AddTopicSchema, type AddTopicFormInput, type TopicDocument, ChartDataItem } from '@/lib/types';
+import {
+  addDoc,
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  where,
+  doc,
+  getDoc,
+  DocumentData,
+} from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
+import {
+  getQuestionAggregatesAction,
+  getAllQuestionsAction,
+} from './questionActions';
+import { TOPIC_CHART_COLORS } from '../constants';
 
 interface ActionResult {
   success: boolean;
@@ -26,7 +43,7 @@ const parseTimestampToDate = (timestampField: any): Date => {
     }
   }
   console.warn(`[parseTimestampToDate] Failed to parse timestamp:`, timestampField, `Returning current date.`);
-  return new Date(); 
+  return new Date();
 };
 
 
@@ -71,9 +88,9 @@ export async function addTopicAction(data: AddTopicFormInput): Promise<ActionRes
     };
     await addDoc(collection(db, 'topics'), topicData);
     console.log(`[addTopicAction] Topic "${validationResult.data.name}" created successfully for user "${validationResult.data.userId}".`);
-    
+
     revalidatePath('/topics');
-    revalidatePath('/'); 
+    revalidatePath('/');
     return {
       success: true,
       message: 'Topic added successfully!',
@@ -116,13 +133,13 @@ export async function getTopicsAction(userId: string | null | undefined): Promis
     const topicsCollectionRef = collection(db, 'topics');
     // TEMPORARILY REMOVED orderBy('name', 'asc') for diagnostics, re-add if index exists
     const topicsQuery = query(
-      topicsCollectionRef, 
+      topicsCollectionRef,
       where('userId', '==', userId)
       // orderBy('name', 'asc') // Requires index: userId ASC, name ASC
     );
     // console.log(`[getTopicsAction] TEMPORARILY SIMPLIFIED QUERY. Original would be: query(topicsCollectionRef, where('userId', '==', userId), orderBy('name', 'asc'))`);
     // console.log(`[getTopicsAction] If data loads now but is unsorted, you NEED an INDEX on 'topics': userId (Ascending), name (Ascending)`);
-    
+
     console.log(`[getTopicsAction] Constructed Firestore query for topics (user "${userId}"):`, JSON.stringify({
       collection: 'topics',
       filters: [{ field: 'userId', op: '==', value: userId }],
@@ -181,7 +198,7 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
       const data = topicDocSnap.data() as DocumentData;
       if (data.userId !== userId) {
         console.warn(`[getTopicByIdAction] User ${userId} not authorized to view topic ${resolvedTopicId} owned by ${data.userId}. Returning null.`);
-        return null; 
+        return null;
       }
       console.log(`[getTopicByIdAction] Found topic "${data.name}" for ID ${resolvedTopicId}.`);
       return {
@@ -199,4 +216,35 @@ export async function getTopicByIdAction(topicId: string, userId: string | null 
     console.error(`[getTopicByIdAction] Error fetching topic by ID ${resolvedTopicId} for user ${userId}:`, error);
     return null;
   }
+}
+
+export async function getTopicAggregatesAction(
+  userId: string | null | undefined
+): Promise<ChartDataItem[]> {
+  if (!userId) {
+    return [];
+  }
+
+  const questions = await getAllQuestionsAction(userId);
+  if (questions.length === 0) {
+    return [];
+  }
+
+  const countsByTopic: { [key: string]: number } = {};
+  for (const question of questions) {
+    if (question.topicName) {
+      countsByTopic[question.topicName] =
+        (countsByTopic[question.topicName] || 0) + 1;
+    }
+  }
+
+  const topicData: ChartDataItem[] = Object.entries(countsByTopic)
+    .map(([name, count], index) => ({
+      name,
+      count,
+      fill: TOPIC_CHART_COLORS[index % TOPIC_CHART_COLORS.length],
+    }))
+    .sort((a, b) => b.count - a.count); // Sort by count descending
+
+  return topicData;
 }

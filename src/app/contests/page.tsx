@@ -141,9 +141,9 @@ export default function ContestsPage() {
                   const normalizedContestDate = new Date(contest.date);
                   normalizedContestDate.setHours(0,0,0,0);
 
-                  let status: "Upcoming" | "Past" | "Today" = "Upcoming";
+                  let status: "Upcoming" | "Completed" | "Today" = "Upcoming";
                   if (normalizedContestDate < today) {
-                    status = "Past";
+                    status = "Completed";
                   } else if (normalizedContestDate.getTime() === today.getTime()) {
                     status = "Today";
                   }
