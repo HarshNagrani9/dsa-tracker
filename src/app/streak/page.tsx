@@ -14,6 +14,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { Heatmap } from '@/components/dashboard/Heatmap';
+import '@/styles/heatmap.css';
 
 export default function StreakPage() {
   const { user, loading: authLoading } = useAuth();
@@ -201,32 +203,7 @@ export default function StreakPage() {
         </Card>
       )}
 
-       <Card>
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <CalendarDays className="h-6 w-6" />
-                Activity Heatmap (Future Feature)
-            </CardTitle>
-            <CardDescription>
-                Visualize your daily activity and consistency over time. This feature is planned for a future update.
-            </CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-                <Image
-                src="https://placehold.co/300x150.png"
-                alt="Streak Calendar Placeholder"
-                width={300}
-                height={150}
-                className="rounded-md mb-6 shadow-md opacity-70"
-                data-ai-hint="calendar heatmap"
-                />
-                <p className="text-muted-foreground">
-                A visual calendar heatmap will show your daily solved questions or activities. Stay tuned!
-                </p>
-            </div>
-        </CardContent>
-       </Card>
+       <Heatmap />
     </div>
   );
 }

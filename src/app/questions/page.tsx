@@ -24,12 +24,14 @@ import { Badge } from "@/components/ui/badge";
 import type { QuestionDocument, Difficulty, Platform, FilterOption } from "@/lib/types";
 import { format } from 'date-fns';
 import { useAuth } from '@/providers/AuthProvider';
-import { getAllQuestionsAction } from '@/lib/actions/questionActions';
+import { getAllQuestionsAction, toggleQuestionCompletionAction } from '@/lib/actions/questionActions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { User, ListX, Filter as FilterIcon, Loader2, FileQuestion } from 'lucide-react'; // Added FileQuestion for consistency
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { QuestionsTable } from '@/components/questions/QuestionsTable';
+import { toast } from '@/hooks/use-toast';
 
 export default function QuestionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -69,6 +71,33 @@ export default function QuestionsPage() {
       setIsLoading(false);
     }
   }, [user, authLoading]);
+
+  const handleToggleCompletion = async (questionId: string, completed: boolean) => {
+    if (!user) return;
+
+    // Optimistic UI update
+    setQuestions(prevQuestions =>
+      prevQuestions.map(q =>
+        q.id === questionId ? { ...q, completed } : q
+      )
+    );
+
+    const result = await toggleQuestionCompletionAction(questionId, completed, user.uid);
+
+    if (!result.success) {
+      // Revert on failure
+      setQuestions(prevQuestions =>
+        prevQuestions.map(q =>
+          q.id === questionId ? { ...q, completed: !completed } : q
+        )
+      );
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredQuestions = React.useMemo(() => {
     return questions.filter(question => {
@@ -170,56 +199,7 @@ export default function QuestionsPage() {
               <p className="text-sm text-muted-foreground">You haven&apos;t added any questions yet. Click &quot;Add Question&quot; in the header to get started!</p>
             </div>
           ) : filteredQuestions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Topic</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Platform</TableHead>
-                  <TableHead>Added On</TableHead>
-                  <TableHead className="text-right">Link</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuestions.map((question) => (
-                  <TableRow key={question.id}>
-                    <TableCell className="font-medium">{question.title}</TableCell>
-                    <TableCell>{question.topicName}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={
-                          question.difficulty === "Easy" ? "secondary" : 
-                          question.difficulty === "Medium" ? "default" : 
-                          question.difficulty === "Hard" ? "destructive" : "outline"
-                        }
-                        className={
-                          question.difficulty === "Medium" ? "bg-accent text-accent-foreground" : ""
-                        }
-                      >
-                        {question.difficulty}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{question.platform}</TableCell>
-                    <TableCell>{format(question.createdAt, 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="text-right">
-                      {question.link ? (
-                        <a 
-                          href={question.link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          View
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <QuestionsTable questions={filteredQuestions} onToggleCompletion={handleToggleCompletion} />
           ) : (
             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
               <FilterIcon className="h-16 w-16 text-muted-foreground mb-4" />

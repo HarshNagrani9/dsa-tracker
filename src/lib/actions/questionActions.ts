@@ -4,7 +4,7 @@
 import type { AddQuestionFormInput, QuestionDocument } from '@/lib/types';
 import { AddQuestionSchema } from '@/lib/types';
 import { db } from '@/lib/firebase/config';
-import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp, orderBy, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where, Timestamp, orderBy, DocumentData, runTransaction, doc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 import { updateStreakOnActivityAction } from './streakActions';
 
@@ -146,6 +146,44 @@ export async function addQuestionAction(data: AddQuestionFormInput): Promise<Act
   }
 }
 
+export async function toggleQuestionCompletionAction(questionId: string, completed: boolean, userId: string): Promise<ActionResult> {
+  if (!userId) {
+    return { success: false, message: "User not authenticated.", error: "User ID is missing." };
+  }
+
+  const completionRef = doc(db, "questionCompletions", `${userId}_${questionId}`);
+
+  try {
+    if (completed) {
+      await runTransaction(db, async (transaction) => {
+        transaction.set(completionRef, {
+          userId: userId,
+          questionId: questionId,
+          completedAt: serverTimestamp(),
+        });
+      });
+      // Also update streak
+      await updateStreakOnActivityAction(userId);
+    } else {
+      await runTransaction(db, async (transaction) => {
+        transaction.delete(completionRef);
+      });
+    }
+    revalidatePath('/questions');
+    revalidatePath('/topics');
+    revalidatePath('/streak');
+    return { success: true, message: `Question status updated.` };
+  } catch (e) {
+    console.error("Error toggling question completion status: ", e);
+    let errorMessage = "Failed to update question status.";
+    if (e instanceof Error) {
+      errorMessage = e.message;
+    }
+    return { success: false, message: "Error updating status.", error: errorMessage };
+  }
+}
+
+
 export async function getQuestionsByTopicNameAction(topicName: string, userId: string | null | undefined): Promise<QuestionDocument[]> {
   if (!userId) {
     console.log("[getQuestionsByTopicNameAction] No userId provided, returning empty array.");
@@ -173,7 +211,7 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
     const querySnapshot = await getDocs(q);
     console.log(`[getQuestionsByTopicNameAction] Firestore query executed. Found ${querySnapshot.size} questions for topic "${topicName}", userId: ${userId}`);
 
-    const questions = querySnapshot.docs.map(doc => {
+    const questions: QuestionDocument[] = querySnapshot.docs.map(doc => {
       const data = doc.data() as DocumentData;
       return {
         id: doc.id,
@@ -189,10 +227,22 @@ export async function getQuestionsByTopicNameAction(topicName: string, userId: s
         updatedAt: parseTimestampToDate(data.updatedAt),
       } as QuestionDocument;
     });
+
+    // Fetch completion data
+    const completions = await getQuestionCompletions(userId);
+    const completedQuestionIds = new Map(completions.map(c => [c.questionId, c.completedAt]));
+
+    const mergedQuestions = questions.map(q => ({
+      ...q,
+      completed: completedQuestionIds.has(q.id),
+      completedAt: completedQuestionIds.get(q.id),
+    }));
+
+
     // Sort client-side if not ordering in the query
-    questions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    console.log(`[getQuestionsByTopicNameAction] Successfully mapped and sorted ${questions.length} questions.`);
-    return questions;
+    mergedQuestions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    console.log(`[getQuestionsByTopicNameAction] Successfully mapped and sorted ${mergedQuestions.length} questions.`);
+    return mergedQuestions;
   } catch (error) {
     console.error(`[getQuestionsByTopicNameAction] Error fetching questions for topic "${topicName}", user "${userId}": `, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
@@ -235,7 +285,7 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     const querySnapshot = await getDocs(q);
     console.log(`[getAllQuestionsAction] Firestore query executed. Found ${querySnapshot.size} questions for userId: ${userId}`);
 
-    const questions = querySnapshot.docs.map(doc => {
+    const questions: QuestionDocument[] = querySnapshot.docs.map(doc => {
       const data = doc.data() as DocumentData;
       return {
         id: doc.id,
@@ -251,12 +301,23 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
         updatedAt: parseTimestampToDate(data.updatedAt),
       } as QuestionDocument;
     });
-    // Sort client-side by createdAt
-    questions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    console.log(`[getAllQuestionsAction] Successfully mapped and sorted ${questions.length} questions.`);
-    return questions;
+
+     // Fetch completion data
+    const completions = await getQuestionCompletions(userId);
+    const completedQuestionIds = new Map(completions.map(c => [c.questionId, c.completedAt]));
+
+    const mergedQuestions = questions.map(q => ({
+      ...q,
+      completed: completedQuestionIds.has(q.id),
+      completedAt: completedQuestionIds.get(q.id),
+    }));
+
+    // Sort client-side
+    mergedQuestions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    console.log(`[getAllQuestionsAction] Successfully mapped and sorted ${mergedQuestions.length} questions.`);
+    return mergedQuestions;
   } catch (error) {
-    console.error(`[getAllQuestionsAction] Error fetching all questions for user ${userId}:`, error);
+    console.error(`[getAllQuestionsAction] Error fetching all questions for user "${userId}": `, error);
     if (error instanceof Error && (error.message.includes("query requires an index") || error.message.includes("needs an index"))) {
       console.error(`--------------------------------------------------------------------------------`);
       console.error(`!!! FIRESTORE INDEX REQUIRED for 'questions' collection for Questions Page (if ordering by createdAt in query). !!!`);
@@ -269,6 +330,33 @@ export async function getAllQuestionsAction(userId: string | null | undefined): 
     }
     return []; 
   }
+}
+
+async function getQuestionCompletions(userId: string): Promise<{ questionId: string; completedAt: Date }[]> {
+  const completionsCol = collection(db, 'questionCompletions');
+  const q = query(completionsCol, where('userId', '==', userId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      questionId: data.questionId,
+      completedAt: parseTimestampToDate(data.completedAt),
+    };
+  });
+}
+
+export async function getHeatmapDataAction(userId: string | null | undefined): Promise<{ date: string; count: number }[]> {
+    if (!userId) return [];
+    
+    const completions = await getQuestionCompletions(userId);
+    const countsByDay: { [key: string]: number } = {};
+
+    completions.forEach(c => {
+        const date = c.completedAt.toISOString().split('T')[0]; // YYYY-MM-DD
+        countsByDay[date] = (countsByDay[date] || 0) + 1;
+    });
+
+    return Object.entries(countsByDay).map(([date, count]) => ({ date, count }));
 }
 
 

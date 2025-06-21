@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
-import { Loader2 } from 'lucide-react';
+import { Loader2, BookText, Link2, FolderKanban, BarChart3, Globe, MessageSquare, StickyNote, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { DialogClose } from '@/components/ui/dialog';
 
@@ -102,57 +102,59 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <FormField
-          control={form.control}
-          name="title"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Title</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Two Sum" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><BookText className="h-4 w-4 mr-2" /> Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Two Sum" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="link"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Link (Optional)</FormLabel>
-              <FormControl>
-                <Input placeholder="https://leetcode.com/problems/two-sum/" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name="link"
+              render={({ field }) => (
+                <FormItem>
+                    <FormLabel className="flex items-center"><Link2 className="h-4 w-4 mr-2" /> Link <span className="text-xs text-muted-foreground ml-1">(Optional)</span></FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://leetcode.com/problems/two-sum/" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={form.control}
+              name="topicName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><FolderKanban className="h-4 w-4 mr-2" /> Topic</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Arrays" {...field} />
+                  </FormControl>
+                  <FormDescription>Enter the main topic for this question.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
         
-        <FormField
-          control={form.control}
-          name="topicName"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Topic</FormLabel>
-              <FormControl>
-                <Input placeholder="e.g., Arrays" {...field} />
-              </FormControl>
-              <FormDescription>Enter the main topic for this question.</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField
             control={form.control}
             name="difficulty"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Difficulty</FormLabel>
+                <FormLabel className="flex items-center"><BarChart3 className="h-4 w-4 mr-2" /> Difficulty</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -177,7 +179,7 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
             name="platform"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Platform</FormLabel>
+                <FormLabel className="flex items-center"><Globe className="h-4 w-4 mr-2" /> Platform</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -198,54 +200,61 @@ export function AddQuestionForm({ onFormSubmitSuccess }: AddQuestionFormProps) {
           />
         </div>
         
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Description (Optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Briefly describe the question or your approach."
-                  className="resize-none"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4 pt-2">
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><MessageSquare className="h-4 w-4 mr-2" /> Description <span className="text-xs text-muted-foreground ml-1">(Optional)</span></FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Briefly describe the question or your approach."
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-        <FormField
-          control={form.control}
-          name="comments"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Notes/Comments (Optional)</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Any personal notes, hints, or reflections."
-                  className="resize-none"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+            <FormField
+              control={form.control}
+              name="comments"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center"><StickyNote className="h-4 w-4 mr-2" /> Notes/Comments <span className="text-xs text-muted-foreground ml-1">(Optional)</span></FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Any personal notes, hints, or reflections."
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        </div>
+
         <FormField
           control={form.control}
           name="userId"
           render={({ field }) => <input type="hidden" {...field} />}
         />
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-3 pt-4">
           <DialogClose asChild>
             <Button type="button" variant="outline">
               Cancel
             </Button>
           </DialogClose>
           <Button type="submit" disabled={isSubmitting || authLoading || !user}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+                <PlusCircle className="mr-2 h-4 w-4" />
+            )}
             {isSubmitting ? 'Adding...' : 'Add Question'}
           </Button>
         </div>

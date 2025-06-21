@@ -66,6 +66,8 @@ export interface QuestionDocument extends Omit<AddQuestionFormInput, 'userId'> {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  completed?: boolean;
+  completedAt?: Date;
 }
 
 // Contest Types
@@ -120,6 +122,11 @@ export type ActivityLog = {
   date: string; // YYYY-MM-DD
   count: number;
   userId: string;
+};
+
+export type HeatmapData = {
+  date: string; // YYYY-MM-DD
+  count: number;
 };
 
 // Chart data types

@@ -55,7 +55,7 @@ export function AppHeader() {
                 </DialogDescription>
               </DialogHeader>
               <ScrollArea className="max-h-[60vh] sm:max-h-[65vh] w-full">
-                <div className="pr-4 py-1"> {/* Add padding for scrollbar and a little vertical padding */}
+                <div className="p-4"> {/* Add padding for scrollbar and a little vertical padding */}
                   <AddQuestionForm 
                     onFormSubmitSuccess={() => setIsAddQuestionDialogOpen(false)} 
                   />

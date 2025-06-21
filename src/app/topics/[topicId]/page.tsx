@@ -4,7 +4,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { getTopicByIdAction } from '@/lib/actions/topicActions';
-import { getQuestionsByTopicNameAction } from '@/lib/actions/questionActions';
+import { getQuestionsByTopicNameAction, toggleQuestionCompletionAction } from '@/lib/actions/questionActions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -24,6 +24,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DIFFICULTIES, PLATFORMS } from '@/lib/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { QuestionsTable } from '@/components/questions/QuestionsTable';
+import { toast } from '@/hooks/use-toast';
 
 interface TopicDetailPageProps {
   params: { // Keep this structure for the prop type
@@ -87,6 +89,33 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
       if (!user) setError(null); // Clear error if it was due to no user initially
     }
   }, [topicId, user, authLoading]);
+
+  const handleToggleCompletion = async (questionId: string, completed: boolean) => {
+    if (!user) return;
+
+    // Optimistic UI update
+    setQuestions(prevQuestions =>
+      prevQuestions.map(q =>
+        q.id === questionId ? { ...q, completed } : q
+      )
+    );
+
+    const result = await toggleQuestionCompletionAction(questionId, completed, user.uid);
+
+    if (!result.success) {
+      // Revert on failure
+      setQuestions(prevQuestions =>
+        prevQuestions.map(q =>
+          q.id === questionId ? { ...q, completed: !completed } : q
+        )
+      );
+      toast({
+        title: "Error",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredQuestions = React.useMemo(() => {
     return questions.filter(question => {
@@ -248,68 +277,19 @@ export default function TopicDetailPage({ params: paramsProp }: TopicDetailPageP
         <CardContent>
           {questions.length === 0 && !isLoading ? ( // Ensure not loading before showing "No Questions Yet"
              <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-              <ListX className="h-12 w-12 text-muted-foreground mb-3" />
-              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet for {topic.name}</h3>
-              <p className="text-sm text-muted-foreground">Add questions to this topic to see them here.</p>
+              <ListX className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Yet</h3>
+              <p className="text-muted-foreground">This topic doesn&apos;t have any questions associated with it.</p>
             </div>
           ) : filteredQuestions.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Difficulty</TableHead>
-                  <TableHead>Platform</TableHead>
-                  <TableHead>Added On</TableHead>
-                  <TableHead className="text-right">Link</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuestions.map((question) => (
-                  <TableRow key={question.id}>
-                    <TableCell className="font-medium">{question.title}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={
-                          question.difficulty === "Easy" ? "secondary" : 
-                          question.difficulty === "Medium" ? "default" : 
-                          question.difficulty === "Hard" ? "destructive" : "outline"
-                        }
-                        className={
-                          question.difficulty === "Medium" ? "bg-accent text-accent-foreground" : ""
-                        }
-                      >
-                        {question.difficulty}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{question.platform}</TableCell>
-                    <TableCell>{format(question.createdAt, 'MMM d, yyyy')}</TableCell>
-                    <TableCell className="text-right">
-                      {question.link ? (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a 
-                            href={question.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            View <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </Button>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (questions.length > 0 && filteredQuestions.length === 0 && !isLoading) ? ( // Show filter message only if there are questions but none match filter
-            <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
-              <FilterIcon className="h-12 w-12 text-muted-foreground mb-3" />
-              <h3 className="text-xl font-semibold text-muted-foreground">No Questions Match Filters</h3>
-              <p className="text-sm text-muted-foreground">Try adjusting your difficulty or platform filters for the topic &quot;{topic.name}&quot;.</p>
-            </div>
-          ) : null}
+            <QuestionsTable questions={filteredQuestions} onToggleCompletion={handleToggleCompletion} />
+          ) : (
+             <div className="mt-4 p-8 bg-muted/30 rounded-md flex flex-col items-center justify-center text-center min-h-[200px]">
+                <FilterIcon className="h-16 w-16 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold text-muted-foreground">No Questions Match Filters</h3>
+                <p className="text-muted-foreground">Try adjusting your difficulty or platform filters.</p>
+             </div>
+          )}
         </CardContent>
       </Card>
     </div>
