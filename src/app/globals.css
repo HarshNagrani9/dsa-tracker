@@ -6,6 +6,7 @@
   :root {
     --background: 0 0% 93.3%; /* Light Gray #EEEEEE */
     --foreground: 0 0% 10%; /* Darker text for better contrast */
+    --foreground-rgb: 25.5, 25.5, 25.5;
     --card: 0 0% 100%; /* White */
     --card-foreground: 0 0% 10%;
     --popover: 0 0% 100%; /* White */
@@ -44,6 +45,7 @@
   .dark {
     --background: 0 0% 10.2%; /* Nearly Black #1A1A1A */
     --foreground: 0 0% 93.3%; /* Light Gray text */
+    --foreground-rgb: 238, 238, 238;
     --card: 0 0% 15%; /* Slightly lighter than dark bg */
     --card-foreground: 0 0% 93.3%;
     --popover: 0 0% 15%;
@@ -85,5 +87,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(rgba(var(--foreground-rgb), 0.1) 1px, transparent 1px);
+    background-size: 1.5rem 1.5rem;
+    background-attachment: fixed;
   }
 }
