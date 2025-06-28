@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -31,6 +30,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { PLATFORMS } from '@/lib/constants';
 import { useAuth } from '@/providers/AuthProvider';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AddContestFormProps {
   onFormSubmitSuccess: () => void;
@@ -50,6 +50,7 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
       startTime: '',
       endTime: '',
       userId: '', // Will be set from auth context
+      attempted: false,
     },
   });
 
@@ -78,7 +79,7 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
         });
         form.reset({
           title: '', platform: undefined, date: undefined, startTime: '',
-          endTime: '', userId: user.uid
+          endTime: '', userId: user.uid, attempted: false
         });
         onFormSubmitSuccess();
       } else {
@@ -212,6 +213,19 @@ export function AddContestForm({ onFormSubmitSuccess }: AddContestFormProps) {
             )}
           />
         </div>
+        <FormField
+          control={form.control}
+          name="attempted"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+              <FormControl>
+                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+              <FormLabel className="mb-0">Attempted</FormLabel>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="userId"

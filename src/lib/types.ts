@@ -1,4 +1,3 @@
-
 import type { LucideIcon } from "lucide-react";
 import { z } from "zod";
 import { DIFFICULTIES, PLATFORMS } from "./constants";
@@ -79,7 +78,8 @@ export const AddContestSchema = z.object({
   date: z.date({ required_error: "Contest date is required." }),
   startTime: z.string().regex(timeRegex, "Invalid start time format (HH:MM)."),
   endTime: z.string().regex(timeRegex, "Invalid end time format (HH:MM)."),
-  userId: z.string({ required_error: "User ID is required."})
+  userId: z.string({ required_error: "User ID is required."}),
+  attempted: z.boolean().optional().default(false),
 }).refine(data => {
   // Basic time validation, can be improved if needed
   return true; // Assuming valid times for now, or add more complex validation
@@ -101,6 +101,7 @@ export interface ContestDocumentFirestore {
   userId: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  attempted?: boolean;
 }
 
 // Client-side representation
@@ -114,6 +115,7 @@ export interface ContestDocumentClient {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  attempted?: boolean;
 }
 
 

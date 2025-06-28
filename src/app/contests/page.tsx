@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from 'react';
@@ -16,6 +15,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { SignInForm } from '@/components/auth/SignInForm';
+import { Checkbox } from '@/components/ui/checkbox';
+import { updateContestAttemptedAction } from '@/lib/actions/contestActions';
 
 export default function ContestsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -129,6 +130,7 @@ export default function ContestsPage() {
                   <TableHead>Platform</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Time</TableHead>
+                  <TableHead>Attempted</TableHead>
                   <TableHead className="text-right">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -154,6 +156,18 @@ export default function ContestsPage() {
                       <TableCell>{contest.platform}</TableCell>
                       <TableCell>{format(contest.date, 'MMM d, yyyy')}</TableCell>
                       <TableCell>{contest.startTime} - {contest.endTime}</TableCell>
+                      <TableCell>
+                        <Checkbox
+                          checked={contest.attempted ?? false}
+                          onCheckedChange={async (checked) => {
+                            setIsLoading(true);
+                            await updateContestAttemptedAction(contest.id, checked === true);
+                            setContests((prev) => prev.map((c) => c.id === contest.id ? { ...c, attempted: checked === true } : c));
+                            setIsLoading(false);
+                          }}
+                          aria-label="Mark as attempted"
+                        />
+                      </TableCell>
                       <TableCell className="text-right">
                         <Badge 
                           variant={status === "Upcoming" ? "secondary" : status === "Today" ? "default" : "outline"}

@@ -1,9 +1,8 @@
-
 'use server';
 
 import { db } from '@/lib/firebase/config';
 import { AddContestSchema, type AddContestFormInput, type ContestDocumentClient, type ContestDocumentFirestore } from '@/lib/types';
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, DocumentData } from 'firebase/firestore';
+import { addDoc, collection, getDocs, orderBy, query, serverTimestamp, Timestamp, where, DocumentData, doc, updateDoc } from 'firebase/firestore';
 import { revalidatePath } from 'next/cache';
 
 interface ActionResult {
@@ -54,6 +53,7 @@ export async function addContestAction(data: AddContestFormInput): Promise<Actio
       userId: validationResult.data.userId,
       createdAt: serverTimestamp() as Timestamp, 
       updatedAt: serverTimestamp() as Timestamp,
+      attempted: validationResult.data.attempted ?? false,
     };
     await addDoc(collection(db, 'contests'), contestData);
     console.log(`[addContestAction] Contest "${validationResult.data.title}" added successfully for user ${validationResult.data.userId}.`);
@@ -115,6 +115,7 @@ export async function getContestsAction(userId: string | null | undefined): Prom
         userId: data.userId,
         createdAt: parseTimestampToDate(data.createdAt),
         updatedAt: parseTimestampToDate(data.updatedAt),
+        attempted: data.attempted ?? false,
       } as ContestDocumentClient; 
     });
     console.log(`[getContestsAction] Successfully mapped ${contests.length} contests.`);
@@ -177,6 +178,21 @@ export async function getUpcomingContestsCountAction(userId: string | null | und
       console.error(`--------------------------------------------------------------------------------`);
     }
     return 0;
+  }
+}
+
+export async function updateContestAttemptedAction(contestId: string, attempted: boolean): Promise<ActionResult> {
+  try {
+    const contestRef = doc(db, 'contests', contestId);
+    await updateDoc(contestRef, {
+      attempted,
+      updatedAt: serverTimestamp(),
+    });
+    revalidatePath('/contests');
+    revalidatePath('/');
+    return { success: true, message: 'Contest attempted status updated.' };
+  } catch (error) {
+    return { success: false, message: 'Failed to update attempted status.', error: (error as Error).message };
   }
 }
 
